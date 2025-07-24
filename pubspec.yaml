@@ -1,0 +1,50 @@
+name: farm_agrobot
+description: "A new Flutter project."
+
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  
+  cupertino_icons: ^1.0.8
+  get: ^4.7.2
+  connectivity_plus: ^6.1.4
+  curved_labeled_navigation_bar: ^2.0.6
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  image_picker: ^1.1.2
+  image_handler: ^0.0.2
+  file_picker: ^5.5.0
+  http: ^0.13.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  
+  flutter_lints: ^5.0.0
+
+
+flutter:
+
+  
+  uses-material-design: true
+
+  assets:
+        - assets/images/xeLogo.png
+        - assets/images/leaf.png
+        - assets/images/2leaves.png
+        - assets/images/exp_avatar.jpg
+ 
+  fonts:
+    - family: Work Sans
+      fonts:
+        - asset: assets/fonts/WorkSans-Regular.ttf
