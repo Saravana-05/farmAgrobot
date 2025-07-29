@@ -4,70 +4,54 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import '../../../data/models/expense/expense_model.dart';
-import '../../../data/services/expenses/expense_service.dart';
+import '../../../data/models/employee/emp_model.dart';
+import '../../../data/services/employee/emp_service.dart';
 import '../../../routes/app_pages.dart';
-import '../views/expense_screen.dart';
 
-class AddExpensesController extends GetxController {
+class AddEmployeeController extends GetxController {
   // Observable variables
   var isSaving = false.obs;
   var image = Rxn<Uint8List>();
   var selectedIndex = 0.obs;
   var isUploading = false.obs;
-  var selectedCategoryTypes = Rxn<String>();
-  var selectedModeOfPayment = Rxn<String>();
+  var selectedEmployeeType = Rxn<String>();
+  var selectedGender = Rxn<String>();
+  var selectedStatus = true.obs;
 
   // Text controllers
-  final TextEditingController expNameController = TextEditingController();
-  final TextEditingController dateController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
-  final TextEditingController amountController = TextEditingController();
-  final TextEditingController spentByController = TextEditingController();
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController tamilNameController = TextEditingController();
+  final TextEditingController contactController = TextEditingController();
+  final TextEditingController joiningDateController = TextEditingController();
 
   // Service
-  final ExpenseService _expenseService = Get.put(ExpenseService());
+  final EmployeeService _employeeService = Get.put(EmployeeService());
 
   // Image picker
   final ImagePicker _picker = ImagePicker();
   File? _imageFile;
 
-  // Static data (replacing Firebase data)
-  final List<String> modeOfPayment = ['Cash', 'Card', 'UPI', 'Bank', 'Cheque'];
-  final List<String> categoryTypes = [
-    'Advance',
-    'Food',
-    'Transport',
-    'Donation and Give Away',
-    'Driver',
-    'Miscellinious',
-    'Machine and Motor Repairs',
-    'Jeep Maintenance',
-    'Eb/Phone/Admin Exp',
-    'Fuel',
-    'Tree Samplings',
-    'Farm Maintenance',
-    'Weekly Wages'
-  ];
+  // Static data
+  final List<String> employeeTypes = ['Regular', 'Contract', 'Others'];
+  final List<String> genders = ['Male', 'Female', 'Other'];
 
   @override
   void onInit() {
     super.onInit();
     // Set current date as default
-    dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
   }
 
   @override
   void onClose() {
-    expNameController.dispose();
-    dateController.dispose();
-    descriptionController.dispose();
-    amountController.dispose();
-    spentByController.dispose();
+    nameController.dispose();
+    tamilNameController.dispose();
+    contactController.dispose();
+    joiningDateController.dispose();
     super.onClose();
   }
 
-  Future<void> selectDate() async {
+  Future<void> selectJoiningDate() async {
     final DateTime? picked = await showDatePicker(
       context: Get.context!,
       initialDate: DateTime.now(),
@@ -75,7 +59,7 @@ class AddExpensesController extends GetxController {
       lastDate: DateTime(2101),
     );
     if (picked != null) {
-      dateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      joiningDateController.text = DateFormat('yyyy-MM-dd').format(picked);
     }
   }
 
@@ -155,10 +139,10 @@ class AddExpensesController extends GetxController {
   }
 
   bool _validateForm() {
-    if (expNameController.text.trim().isEmpty) {
+    if (nameController.text.trim().isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please enter expense name',
+        'Please enter employee name',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -166,10 +150,10 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (dateController.text.trim().isEmpty) {
+    if (tamilNameController.text.trim().isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please select expense date',
+        'Please enter Tamil name',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -177,11 +161,11 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (selectedCategoryTypes.value == null ||
-        selectedCategoryTypes.value!.isEmpty) {
+    if (selectedEmployeeType.value == null ||
+        selectedEmployeeType.value!.isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please select expense category',
+        'Please select employee type',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -189,10 +173,11 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (amountController.text.trim().isEmpty) {
+    if (selectedGender.value == null ||
+        selectedGender.value!.isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please enter amount',
+        'Please select gender',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -200,10 +185,10 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (double.tryParse(amountController.text.trim()) == null) {
+    if (contactController.text.trim().isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please enter valid amount',
+        'Please enter contact number',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -211,10 +196,10 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (spentByController.text.trim().isEmpty) {
+    if (contactController.text.trim().length < 10) {
       Get.snackbar(
         'Validation Error',
-        'Please enter spent by',
+        'Please enter valid contact number',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -222,11 +207,10 @@ class AddExpensesController extends GetxController {
       return false;
     }
 
-    if (selectedModeOfPayment.value == null ||
-        selectedModeOfPayment.value!.isEmpty) {
+    if (joiningDateController.text.trim().isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Please select mode of payment',
+        'Please select joining date',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
@@ -237,7 +221,7 @@ class AddExpensesController extends GetxController {
     return true;
   }
 
-  void saveExpense() async {
+  void saveEmployee() async {
     if (isSaving.value) return;
 
     if (!_validateForm()) return;
@@ -245,23 +229,24 @@ class AddExpensesController extends GetxController {
     try {
       isSaving.value = true;
 
-      // Create expense model
-      ExpenseModel expense = ExpenseModel(
-        expenseName: expNameController.text.trim(),
-        expenseDate: dateController.text.trim(),
-        expenseCategory: selectedCategoryTypes.value!,
-        description: descriptionController.text.trim(),
-        amount: double.parse(amountController.text.trim()),
-        spentBy: spentByController.text.trim(),
-        modeOfPayment: selectedModeOfPayment.value!,
+      // Create employee model
+      Employee employee = Employee(
+        id: '', // Will be set by the backend
+        name: nameController.text.trim(),
+        tamilName: tamilNameController.text.trim(),
+        empType: selectedEmployeeType.value!.toLowerCase(),
+        gender: selectedGender.value!.toLowerCase(),
+        contact: contactController.text.trim(),
+        joiningDate: DateTime.parse(joiningDateController.text.trim()),
+        status: selectedStatus.value,
       );
 
-      // Save expense to API
-      Map<String, dynamic> result = await _expenseService.saveExpense(
-        expense: expense,
+      // Save employee to API
+      Map<String, dynamic> result = await EmployeeService.saveEmployee(
+        employee: employee,
         imageFile: _imageFile,
         imageBytes: image.value,
-        useDefaultImage: _imageFile == null && image.value == null,
+        useDefaultImage: _imageFile == null && image.value == null, employeeData: {},
       );
 
       if (result['success']) {
@@ -278,7 +263,7 @@ class AddExpensesController extends GetxController {
         // Wait for snackbar to show
         await Future.delayed(Duration(milliseconds: 1000));
         // Navigate back with success result
-        Get.offAllNamed(Routes.EXPENSES, arguments: true);
+        Get.offAllNamed(Routes.EMPLOYEE, arguments: true);
       } else {
         Get.snackbar(
           'Error',
@@ -291,7 +276,7 @@ class AddExpensesController extends GetxController {
     } catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to save expense: ${e.toString()}',
+        'Failed to save employee: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -302,19 +287,19 @@ class AddExpensesController extends GetxController {
   }
 
   void _clearForm() {
-    expNameController.clear();
-    dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    selectedCategoryTypes.value = null;
-    descriptionController.clear();
-    amountController.clear();
-    spentByController.clear();
-    selectedModeOfPayment.value = null;
+    nameController.clear();
+    tamilNameController.clear();
+    contactController.clear();
+    joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    selectedEmployeeType.value = null;
+    selectedGender.value = null;
+    selectedStatus.value = true;
     image.value = null;
     _imageFile = null;
   }
 
-  void navigateToViewExpenses() {
-    Get.toNamed(Routes.EXPENSES);
+  void navigateToViewEmployees() {
+    Get.toNamed(Routes.EMPLOYEE);
   }
 
   void navigateToTab(int index) {

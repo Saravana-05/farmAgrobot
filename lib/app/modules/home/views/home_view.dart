@@ -66,7 +66,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.person,
                       title: 'Employee',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToEmployee),
                     ),
                     SmallCard(
                       icon: Icons.present_to_all,

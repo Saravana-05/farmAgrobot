@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'app/data/services/expenses/expense_service.dart';
 import 'app/global_widgets/bottom_navigation/controller/bottom_navigation_controller.dart';
 import 'app/global_widgets/card_grid/controller/card_controller.dart';
+import 'app/modules/employees/controller/employee_controller.dart';
 import 'app/modules/expenses/controller/expense_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/data/services/connectivity_service.dart';
@@ -23,6 +24,7 @@ void main() async {
   Get.put(CardController());
   Get.put(drawer_controller.DrawerController());
   Get.put(ExpensesController());
+  Get.put(EmployeeController());
   Get.put(ExpenseService());
 
   runApp(MyApp());
@@ -32,7 +34,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Xe Organic App',
+      title: 'Farm Agrobot',
       initialRoute: AppPages.INITIAL, // This will be splash screen
       getPages: AppPages.routes,
       initialBinding: AppBinding(),

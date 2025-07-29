@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../employees/views/employee_screen.dart';
 import '../../expenses/views/expense_screen.dart';
 import '../views/home_view.dart';
 
@@ -64,6 +65,10 @@ class HomeController extends GetxController {
 
   void navigateToExpenses() {
     Get.to(() => ExpensesScreen());
+  }
+
+  void navigateToEmployee() {
+    Get.to(() => EmployeeScreen());
   }
 
   // void navigateToAttendance() {

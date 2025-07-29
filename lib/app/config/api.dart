@@ -1,6 +1,7 @@
 const String baseUrl = 'http://192.168.0.114:8000/api/';
 const String baseImgUrl = 'http://192.168.0.114:8000';
 
+// Expenses
 const String addExpense = baseUrl + 'expenses/';
 const String viewExpense = baseUrl + 'expenses/all/';
 const String deleteExpenseUrl = baseUrl + 'expenses/{id}/delete/';
@@ -25,3 +26,10 @@ String getFullImageUrl(String? relativePath) {
   // Otherwise, add both / and base URL
   return '$baseImgUrl/$relativePath';
 }
+
+// Employees
+const String addEmployee = baseUrl + 'employees/';
+const String viewEmployee = baseUrl + 'employees';
+const String deleteEmployeeUrl = baseUrl + 'employees/{id}/delete/';
+const String updateEmployeeUrl = baseUrl + 'employees/{id}/update/';
+const String editEmployeeUrl = baseUrl + 'employees/{id}/edit/';

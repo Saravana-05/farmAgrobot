@@ -273,8 +273,8 @@ class ViewExpenses extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              controller.formatTimestamp(
-                                  DateTime.parse(expense.expenseDate)),
+                              controller.formatTimestamp(expense
+                                  .expenseDate), // Let the method handle parsing
                               style: textStyle,
                             ),
                             Text(
@@ -503,8 +503,8 @@ class ViewExpenses extends StatelessWidget {
                       // Date
                       _buildDetailRow(
                         'Date',
-                        controller.formatTimestamp(
-                            DateTime.parse(expense.expenseDate)),
+                        controller.formatTimestamp(expense
+                            .expenseDate), // Let the method handle parsing
                         Icons.calendar_today,
                       ),
 
