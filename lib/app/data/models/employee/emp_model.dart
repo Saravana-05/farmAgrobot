@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class Employee {
   final String id;
   final String name;
@@ -25,8 +27,27 @@ class Employee {
     this.updatedAt,
   });
 
-  /// Create Employee from JSON (API response)
+  /// Create Employee from JSON (API response) with proper status conversion
   factory Employee.fromJson(Map<String, dynamic> json) {
+    // Handle status conversion from backend (0/1) to boolean
+    bool parseStatus(dynamic statusValue) {
+      if (statusValue == null) return true; // Default to active
+      
+      if (statusValue is bool) {
+        return statusValue;
+      } else if (statusValue is int) {
+        return statusValue == 1; // 1 = active, 0 = inactive
+      } else if (statusValue is String) {
+        // Handle string representations
+        final lowerStatus = statusValue.toLowerCase();
+        return lowerStatus == '1' || 
+               lowerStatus == 'true' || 
+               lowerStatus == 'active';
+      }
+      
+      return true; // Default fallback
+    }
+
     return Employee(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
@@ -37,8 +58,8 @@ class Employee {
       joiningDate: json['joining_date'] != null 
           ? DateTime.parse(json['joining_date']) 
           : DateTime.now(),
-      status: json['status'] ?? true,
-      imageUrl: json['image_url'],
+      status: parseStatus(json['status']),
+      imageUrl: json['image_url'] ?? json['profile_image'], // Handle both field names
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at']) 
           : null,
@@ -57,7 +78,14 @@ class Employee {
       'gender': gender,
       'contact': contact,
       'joining_date': joiningDate.toIso8601String().split('T')[0], // YYYY-MM-DD format
-      'status': status,
+      'status': status ? 1 : 0, // Convert boolean to integer for backend
+    };
+  }
+
+  /// Convert to JSON for status update API calls
+  Map<String, dynamic> toStatusUpdateJson() {
+    return {
+      'status': status ? 1 : 0, // Send as integer to backend
     };
   }
 
@@ -94,13 +122,23 @@ class Employee {
   /// Get formatted joining date
   String get formattedJoiningDate {
     return '${joiningDate.day.toString().padLeft(2, '0')}/'
-           '${joiningDate.month.toString().padLeft(2, '0')}/'
+           '${joiningDate.month.toString().padLeft(2, '0')}'
            '${joiningDate.year}';
   }
 
   /// Get status text
   String get statusText {
     return status ? 'Active' : 'Inactive';
+  }
+
+  /// Get status color
+  Color get statusColor {
+    return status ? Colors.green : Colors.red;
+  }
+
+  /// Get status icon
+  IconData get statusIcon {
+    return status ? Icons.check_circle : Icons.cancel;
   }
 
   /// Get employee type display text
@@ -153,6 +191,21 @@ class Employee {
       return nameParts[0][0].toUpperCase();
     }
     return 'E';
+  }
+
+  /// Get status as integer (for backend compatibility)
+  int get statusAsInt {
+    return status ? 1 : 0;
+  }
+
+  /// Check if employee is active
+  bool get isActive {
+    return status;
+  }
+
+  /// Check if employee is inactive
+  bool get isInactive {
+    return !status;
   }
 
   @override

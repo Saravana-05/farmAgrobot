@@ -586,9 +586,8 @@ class ViewExpenses extends StatelessWidget {
                         },
                         icon: Icon(Icons.edit),
                         label: Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimaryColor,
-                          foregroundColor: Colors.white,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: kPrimaryColor),
                           padding: EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),

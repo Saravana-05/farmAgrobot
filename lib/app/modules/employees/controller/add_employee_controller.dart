@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/employee/emp_model.dart';
 import '../../../data/services/employee/emp_service.dart';
+import '../../../data/services/messages/message_service.dart';
 import '../../../routes/app_pages.dart';
 
 class AddEmployeeController extends GetxController {
@@ -38,8 +39,8 @@ class AddEmployeeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Set current date as default
-    joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    joiningDateController.text =
+        DateFormat('yyyy-MM-dd').format(DateTime.now());
   }
 
   @override
@@ -104,35 +105,21 @@ class AddEmployeeController extends GetxController {
       );
 
       if (pickedFile == null) {
-        Get.snackbar(
-          'Info',
-          'No image selected',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        // Using MessageService - Method 1: Direct access
+        MessageService.to.showInfo('info_no_image');
         return;
       }
 
       _imageFile = File(pickedFile.path);
       final imageBytes = await pickedFile.readAsBytes();
-
-      // Set the image directly
       image.value = imageBytes;
 
-      Get.snackbar(
-        'Success',
-        'Image selected successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      // Using MessageService - Method 1: Direct access
+      MessageService.to.showSuccess('success_image_selected');
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to process image. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // Using MessageService with custom message
+      MessageService.to.showError(
+          'error_image_selection', 'Failed to load image: ${e.toString()}');
     } finally {
       isUploading.value = false;
     }
@@ -140,85 +127,59 @@ class AddEmployeeController extends GetxController {
 
   bool _validateForm() {
     if (nameController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter employee name',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showValidationError('name');
       return false;
     }
 
     if (tamilNameController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter Tamil name',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showValidationError('tamil_name');
       return false;
     }
 
     if (selectedEmployeeType.value == null ||
         selectedEmployeeType.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select employee type',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showValidationError('employee_type');
       return false;
     }
 
-    if (selectedGender.value == null ||
-        selectedGender.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select gender',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+    if (selectedGender.value == null || selectedGender.value!.isEmpty) {
+      MessageService.to.showValidationError('gender');
       return false;
     }
 
     if (contactController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter contact number',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showValidationError('contact');
       return false;
     }
 
     if (contactController.text.trim().length < 10) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter valid contact number',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showWarning('validation_contact_invalid');
       return false;
     }
 
     if (joiningDateController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select joining date',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      MessageService.to.showValidationError('joining_date');
       return false;
     }
 
     return true;
+  }
+
+  Map<String, dynamic> _employeeToRequestData() {
+    Map<String, dynamic> data = {};
+
+    data['name'] = nameController.text.trim();
+    data['tamil_name'] = tamilNameController.text.trim();
+    data['emp_type'] = selectedEmployeeType.value!;
+    data['gender'] = selectedGender.value!;
+    data['contact'] = contactController.text.trim();
+    data['joining_date'] = joiningDateController.text.trim();
+    data['status'] = selectedStatus.value;
+
+    data.removeWhere(
+        (key, value) => value == null || (value is String && value.isEmpty));
+
+    return data;
   }
 
   void saveEmployee() async {
@@ -229,58 +190,57 @@ class AddEmployeeController extends GetxController {
     try {
       isSaving.value = true;
 
-      // Create employee model
       Employee employee = Employee(
-        id: '', // Will be set by the backend
+        id: '',
         name: nameController.text.trim(),
         tamilName: tamilNameController.text.trim(),
-        empType: selectedEmployeeType.value!.toLowerCase(),
-        gender: selectedGender.value!.toLowerCase(),
+        empType: selectedEmployeeType.value!,
+        gender: selectedGender.value!,
         contact: contactController.text.trim(),
         joiningDate: DateTime.parse(joiningDateController.text.trim()),
         status: selectedStatus.value,
       );
 
-      // Save employee to API
+      Map<String, dynamic> employeeData = _employeeToRequestData();
+
       Map<String, dynamic> result = await EmployeeService.saveEmployee(
         employee: employee,
         imageFile: _imageFile,
         imageBytes: image.value,
-        useDefaultImage: _imageFile == null && image.value == null, employeeData: {},
+        useDefaultImage: _imageFile == null && image.value == null,
+        employeeData: employeeData,
       );
 
       if (result['success']) {
-        Get.snackbar(
-          'Success',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        String message = result['message'] ??
+            result['data']?['message'] ??
+            'Employee saved successfully';
 
-        // Clear form
+        // Using MessageService with custom message
+        MessageService.to.showSuccess('success_employee_saved', message);
+
         _clearForm();
-        // Wait for snackbar to show
         await Future.delayed(Duration(milliseconds: 1000));
-        // Navigate back with success result
         Get.offAllNamed(Routes.EMPLOYEE, arguments: true);
       } else {
-        Get.snackbar(
-          'Error',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        String errorMessage = result['message'] ??
+            result['data']?['message'] ??
+            'Failed to save employee';
+
+        if (result['data'] != null && result['data']['errors'] != null) {
+          Map<String, dynamic> errors = result['data']['errors'];
+          String errorDetails = errors.entries
+              .map((entry) => '${entry.key}: ${entry.value.join(', ')}')
+              .join('\n');
+          errorMessage = '$errorMessage\n$errorDetails';
+        }
+
+        MessageService.to.showError('error_employee_save', errorMessage);
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to save employee: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      print('Error in saveEmployee: $e');
+      MessageService.to.showNetworkError(
+          'Network error: Please check your connection and try again');
     } finally {
       isSaving.value = false;
     }
@@ -290,7 +250,8 @@ class AddEmployeeController extends GetxController {
     nameController.clear();
     tamilNameController.clear();
     contactController.clear();
-    joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    joiningDateController.text =
+        DateFormat('yyyy-MM-dd').format(DateTime.now());
     selectedEmployeeType.value = null;
     selectedGender.value = null;
     selectedStatus.value = true;

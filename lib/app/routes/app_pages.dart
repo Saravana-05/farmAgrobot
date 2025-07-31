@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../modules/employees/views/add_employee.dart';
+import '../modules/employees/views/edit_employee_screen.dart';
 import '../modules/employees/views/employee_screen.dart';
 import '../modules/employees/views/employee_view.dart';
 import '../modules/expenses/binding/edit_expense_binding.dart';
@@ -12,6 +13,7 @@ import '../modules/home/binding/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/splash/views/splash_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
+import '../modules/wages/views/wages_screen.dart';
 
 
 
@@ -66,6 +68,16 @@ class AppPages {
     GetPage(
       name: _Paths.ADD_EMPLOYEE,
       page: () => AddEmployee(),   
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_EMPLOYEE,
+      page: () => EditEmployee(),   
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.WAGES,
+      page: () => WagesScreen(),   
       // binding: EditExpenseBinding(),
     ),
    

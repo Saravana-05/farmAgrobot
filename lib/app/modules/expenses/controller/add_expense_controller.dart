@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
 import '../../../routes/app_pages.dart';
-import '../views/expense_screen.dart';
 
 class AddExpensesController extends GetxController {
   // Observable variables
@@ -120,11 +120,7 @@ class AddExpensesController extends GetxController {
       );
 
       if (pickedFile == null) {
-        Get.snackbar(
-          'Info',
-          'No image selected',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        CustomSnackbar.showInfo(title: 'Info', message: 'No image selected');
         return;
       }
 
@@ -134,21 +130,10 @@ class AddExpensesController extends GetxController {
       // Set the image directly
       image.value = imageBytes;
 
-      Get.snackbar(
-        'Success',
-        'Image selected successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showInfo(
+          title: 'Info', message: 'Image selected successfully');
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to process image. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isUploading.value = false;
     }
@@ -156,81 +141,46 @@ class AddExpensesController extends GetxController {
 
   bool _validateForm() {
     if (expNameController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter expense name',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Please enter expense name');
       return false;
     }
 
     if (dateController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select expense date',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Please select expense date');
       return false;
     }
 
     if (selectedCategoryTypes.value == null ||
         selectedCategoryTypes.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select expense category',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Please select expense category');
+
       return false;
     }
 
     if (amountController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter amount',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: 'Please enter amount');
       return false;
     }
 
     if (double.tryParse(amountController.text.trim()) == null) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter valid amount',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: 'Please enter amount');
       return false;
     }
 
     if (spentByController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter spent by',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Please enter spent by');
       return false;
     }
 
     if (selectedModeOfPayment.value == null ||
         selectedModeOfPayment.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select mode of payment',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Please select mode of payment');
+
       return false;
     }
 
@@ -265,12 +215,9 @@ class AddExpensesController extends GetxController {
       );
 
       if (result['success']) {
-        Get.snackbar(
-          'Success',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
+        CustomSnackbar.showSuccess(
+          title: 'Success',
+          message: result['message'],
         );
 
         // Clear form
@@ -280,22 +227,10 @@ class AddExpensesController extends GetxController {
         // Navigate back with success result
         Get.offAllNamed(Routes.EXPENSES, arguments: true);
       } else {
-        Get.snackbar(
-          'Error',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(title: 'Error', message: result['message']);
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to save expense: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isSaving.value = false;
     }

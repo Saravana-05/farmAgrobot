@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'dart:io';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
+import '../../../global_widgets/custom_snackbar/snackbar.dart';
 import '../../../routes/app_pages.dart';
 
 class ExpensesViewController extends GetxController {
@@ -109,21 +110,10 @@ class ExpensesViewController extends GetxController {
           allExpenses.value = filteredExpenses;
         }
       } else {
-        Get.snackbar(
-          'Error',
-          response['message'] ?? 'Failed to load expenses',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(title: 'Error', message: response['message']);
       }
     } catch (e) {
-      print('Load expenses error: $e');
-      Get.snackbar(
-        'Error',
-        'Network error: ${e.toString()}',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isLoading.value = false;
     }
@@ -239,12 +229,9 @@ class ExpensesViewController extends GetxController {
       // Check permission
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
-        Get.snackbar(
-          'Permission Required',
-          'Storage permission is required to save Excel file',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(
+            title: 'Error',
+            message: 'Storage permission is required to save Excel file');
         return;
       }
 
@@ -253,11 +240,9 @@ class ExpensesViewController extends GetxController {
           await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
-        Get.snackbar(
-          'No Data',
-          'No expenses found to export',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
+        CustomSnackbar.showError(
+          title: 'Error',
+          message: 'No expenses found to export',
         );
         return;
       }
@@ -398,12 +383,7 @@ class ExpensesViewController extends GetxController {
       // Check permission
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
-        Get.snackbar(
-          'Permission Required',
-          'Storage permission is required to save PDF file',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(title: 'Error', message: 'Permission denied');
         return;
       }
 
@@ -412,12 +392,7 @@ class ExpensesViewController extends GetxController {
           await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
-        Get.snackbar(
-          'No Data',
-          'No expenses found to export',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(title: 'Error', message: 'No data to export');
         return;
       }
 
@@ -625,21 +600,11 @@ class ExpensesViewController extends GetxController {
       final pdfBytes = await pdf.save();
       await file.writeAsBytes(pdfBytes);
 
-      Get.snackbar(
-        'Download Complete',
-        'PDF file saved to: $filePath',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: Duration(seconds: 5),
-      );
+      // Show success message
+      CustomSnackbar.showInfo(title: 'Info', message: 'PDF downloaded');
     } catch (e) {
-      print('PDF generation error: $e');
-      Get.snackbar(
-        'Download Failed',
-        'Error creating PDF file: ${e.toString()}',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // Show error message
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isDownloading.value = false;
     }
@@ -780,41 +745,25 @@ class ExpensesViewController extends GetxController {
       final success = await ExpenseService.deleteExpense(id);
 
       if (success) {
-        Get.snackbar(
-          'Success',
-          'Expense deleted successfully',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showSuccess(
+            title: 'Success', message: 'Expense deleted');
 
         loadExpenses();
       } else {
-        Get.snackbar(
-          'Error',
-          'Failed to delete expense',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        CustomSnackbar.showError(
+            title: 'Error', message: 'Expense not deleted');
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to delete expense: ${e.toString()}',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isLoading.value = false;
     }
   }
 
   void editExpense(ExpenseModel expense) {
-    Get.snackbar(
-      'Edit',
-      'Edit functionality would be implemented here',
-      backgroundColor: Colors.blue,
-      colorText: Colors.white,
-    );
+   
+    CustomSnackbar.showInfo(title: 'Info', message: 'Edit functionality would be implemented here');
   }
 
   // FIXED: viewExpense with proper null safety

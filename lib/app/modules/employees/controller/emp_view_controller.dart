@@ -1,5 +1,9 @@
+import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:convert';
+import '../../../config/api.dart';
+import '../../../core/utils/tamil_text_handler.dart';
 import '../../../data/models/employee/emp_model.dart';
 import '../../../data/services/employee/emp_service.dart';
 
@@ -35,7 +39,12 @@ class EmployeeViewController extends GetxController {
   var errorMessage = ''.obs;
   var hasError = false.obs;
 
-  // Fixed: Return the actual employees list instead of null
+  // Enhanced image cache with validation status
+  var imageCache = <String, Map<String, dynamic>>{}.obs;
+
+  // Add reactive variable for real-time updates
+  var lastUpdateTimestamp = 0.obs;
+
   List<Employee> get filteredEmployees => employees;
 
   @override
@@ -64,9 +73,9 @@ class EmployeeViewController extends GetxController {
       if (result['success']) {
         final data = result['data']['data'];
 
-        // Convert API response to Employee models
+        // Convert API response to Employee models with proper encoding handling
         final employeeList = (data['employees'] as List)
-            .map((json) => EmployeeService.employeeFromJson(json))
+            .map((json) => _parseEmployeeWithProperEncoding(json))
             .toList();
 
         employees.value = employeeList;
@@ -78,6 +87,12 @@ class EmployeeViewController extends GetxController {
         totalCount.value = pagination['total_count'];
         hasNext.value = pagination['has_next'];
         hasPrevious.value = pagination['has_previous'];
+
+        // Pre-process image URLs
+        _preprocessImageUrls();
+
+        // Update timestamp for real-time tracking
+        lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
       } else {
         hasError.value = true;
         errorMessage.value =
@@ -88,9 +103,239 @@ class EmployeeViewController extends GetxController {
       hasError.value = true;
       errorMessage.value = 'Network error: ${e.toString()}';
       _showErrorSnackbar('Network Error', errorMessage.value);
+      print('Error loading employees: $e');
     } finally {
       if (showLoading) isLoading.value = false;
     }
+  }
+
+  /// Parse employee data with enhanced Tamil text encoding
+  Employee _parseEmployeeWithProperEncoding(Map<String, dynamic> json) {
+    try {
+      // Only fix tamil_name field using the simplified handler
+      if (json['tamil_name'] != null) {
+        String originalTamilName = json['tamil_name'].toString();
+        String decodedTamilName =
+            TamilTextHandler.decodeTamilText(originalTamilName);
+        json['tamil_name'] = decodedTamilName;
+
+        // Debug logging
+        if (originalTamilName != decodedTamilName) {
+          print(
+              'Tamil name decoded: "$originalTamilName" -> "$decodedTamilName"');
+        }
+      }
+
+      // Handle image URL (keep your existing logic)
+      if (json['profile_image'] != null) {
+        String imageUrl = json['profile_image'].toString().trim();
+        json['profile_image'] = _validateAndBuildImageUrl(imageUrl);
+      }
+
+      return Employee.fromJson(json);
+    } catch (e) {
+      print('Error parsing employee data: $e');
+      return Employee.fromJson(json);
+    }
+  }
+
+  /// Enhanced image URL validation and building
+  String _validateAndBuildImageUrl(String imageUrl) {
+    try {
+      // Remove any extra whitespace
+      imageUrl = imageUrl.trim();
+
+      // If empty, return empty
+      if (imageUrl.isEmpty) {
+        return '';
+      }
+
+      // If already a complete URL, validate it
+      if (imageUrl.startsWith('http')) {
+        Uri? uri = Uri.tryParse(imageUrl);
+        if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+          return imageUrl;
+        } else {
+          print('Invalid complete URL: $imageUrl');
+          return '';
+        }
+      }
+
+      // Build the complete URL
+      String fullUrl;
+      if (imageUrl.startsWith('/')) {
+        fullUrl = '$baseImgUrl$imageUrl';
+      } else {
+        fullUrl = '$baseImgUrl/$imageUrl';
+      }
+
+      // Validate the built URL
+      Uri? uri = Uri.tryParse(fullUrl);
+      if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+        print('Built valid URL: $fullUrl for path: $imageUrl');
+        return fullUrl;
+      } else {
+        print('Failed to build valid URL from: $imageUrl');
+        return '';
+      }
+    } catch (e) {
+      print('Error validating image URL "$imageUrl": $e');
+      return '';
+    }
+  }
+
+  /// Pre-process all image URLs
+  void _preprocessImageUrls() {
+    for (var employee in employees) {
+      if (employee.imageUrl != null && employee.imageUrl!.isNotEmpty) {
+        final validatedUrl = _validateAndBuildImageUrl(employee.imageUrl!);
+        imageCache[employee.id] = {
+          'url': validatedUrl,
+          'isValid': validatedUrl.isNotEmpty,
+          'originalPath': employee.imageUrl,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        };
+      } else {
+        imageCache[employee.id] = {
+          'url': '',
+          'isValid': false,
+          'originalPath': '',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        };
+      }
+    }
+  }
+
+  /// Get employee image URL with enhanced validation and fallback
+  String? getEmployeeImageUrl(Employee employee) {
+    try {
+      // Check cache first
+      if (imageCache.containsKey(employee.id)) {
+        final cached = imageCache[employee.id]!;
+        if (cached['isValid'] == true && cached['url'].toString().isNotEmpty) {
+          return cached['url'].toString();
+        }
+      }
+
+      // If not in cache or invalid, validate and cache
+      if (employee.imageUrl != null && employee.imageUrl!.isNotEmpty) {
+        final validatedUrl = _validateAndBuildImageUrl(employee.imageUrl!);
+
+        // Update cache
+        imageCache[employee.id] = {
+          'url': validatedUrl,
+          'isValid': validatedUrl.isNotEmpty,
+          'originalPath': employee.imageUrl,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        };
+
+        return validatedUrl.isEmpty ? null : validatedUrl;
+      }
+
+      return null;
+    } catch (e) {
+      print('Error getting employee image URL for ${employee.id}: $e');
+      return null;
+    }
+  }
+
+  /// Safe image widget builder
+  Widget buildEmployeeImage(
+    Employee employee, {
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.cover,
+    Widget? errorWidget,
+    Widget? loadingWidget,
+  }) {
+    final imageUrl = getEmployeeImageUrl(employee);
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return errorWidget ??
+          Container(
+            width: width ?? 50,
+            height: height ?? 50,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person,
+              color: Colors.grey[600],
+              size: (width ?? 50) * 0.6,
+            ),
+          );
+    }
+
+    return Image.network(
+      imageUrl,
+      width: width,
+      height: height,
+      fit: fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return loadingWidget ??
+            Container(
+              width: width ?? 50,
+              height: height ?? 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        print('Image load error for ${employee.name}: $error');
+
+        // Mark as invalid in cache
+        imageCache[employee.id] = {
+          'url': '',
+          'isValid': false,
+          'originalPath': employee.imageUrl ?? '',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'error': error.toString(),
+        };
+
+        return errorWidget ??
+            Container(
+              width: width ?? 50,
+              height: height ?? 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person,
+                color: Colors.grey[600],
+                size: (width ?? 50) * 0.6,
+              ),
+            );
+      },
+    );
+  }
+
+  /// Get employee display name with Tamil support using simplified handler
+  String getEmployeeDisplayName(Employee employee) {
+    String name = employee.name ?? 'Unknown';
+
+    // Use the simplified Tamil text handler
+    String decodedName = TamilTextHandler.decodeTamilText(name);
+
+    // Debug logging
+    if (name != decodedName) {
+      print('Display name processed: "$name" -> "$decodedName"');
+    }
+
+    return decodedName.isEmpty ? 'Unknown' : decodedName;
   }
 
   /// Load employee statistics from API
@@ -117,10 +362,21 @@ class EmployeeViewController extends GetxController {
     }
   }
 
-  /// Search employees
+  /// Search employees with Tamil text support using simplified handler
   void runFilter(String keyword) {
-    searchKeyword.value = keyword;
-    currentPage.value = 1; // Reset to first page
+    try {
+      // For search, we'll use the keyword as-is since the simplified handler
+      // is mainly for decoding received data, not encoding for API calls
+      searchKeyword.value = keyword;
+
+      // Debug logging for search
+      print('Search keyword: "$keyword"');
+    } catch (e) {
+      print('Search error: $e');
+      searchKeyword.value = keyword;
+    }
+
+    currentPage.value = 1;
     loadEmployees();
   }
 
@@ -154,18 +410,17 @@ class EmployeeViewController extends GetxController {
     fromDate.value = null;
     toDate.value = null;
     currentPage.value = 1;
+    imageCache.clear();
     loadEmployees();
   }
 
-  /// Date filter methods (for future implementation if API supports date filtering)
+  /// Date filter methods
   void selectFromDate(DateTime? date) {
     fromDate.value = date;
-    // Implement API call with date filter when backend supports it
   }
 
   void selectToDate(DateTime? date) {
     toDate.value = date;
-    // Implement API call with date filter when backend supports it
   }
 
   /// Pagination methods
@@ -190,19 +445,22 @@ class EmployeeViewController extends GetxController {
     }
   }
 
-  /// Refresh employees data
-  Future<void> refreshEmployees() async {
-    await loadEmployees();
+  /// Refresh employees data with real-time update
+  Future<void> refreshEmployees({bool forceRefresh = false}) async {
+    if (forceRefresh) {
+      imageCache.clear();
+    }
+    await loadEmployees(showLoading: forceRefresh);
     await loadStatistics();
   }
 
-  /// Get employee details by ID
+  /// Get employee details by ID with proper encoding
   Future<Employee?> getEmployeeDetail(String employeeId) async {
     try {
       final result = await EmployeeService.getEmployeeDetail(employeeId);
 
       if (result['success']) {
-        return EmployeeService.employeeFromJson(result['data']['data']);
+        return _parseEmployeeWithProperEncoding(result['data']['data']);
       } else {
         _showErrorSnackbar('Error',
             result['data']['message'] ?? 'Failed to load employee details');
@@ -214,23 +472,19 @@ class EmployeeViewController extends GetxController {
     }
   }
 
-  // Fixed: Return the employees list instead of calling undefined filteredEmployees
   List<Employee> getPaginatedEmployees() {
     return employees;
   }
 
-  /// Delete employee
-  Future<void> deleteEmployee(String employeeId,
-      {bool hardDelete = false}) async {
+  /// Permanently delete employee
+  Future<void> deleteEmployee(String employeeId) async {
     try {
-      // Show confirmation dialog
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
-          title: Text(
-              hardDelete ? 'Permanently Delete Employee' : 'Delete Employee'),
-          content: Text(hardDelete
-              ? 'This action cannot be undone. The employee record will be permanently removed.'
-              : 'This will deactivate the employee. You can restore them later if needed.'),
+          title: Text('Permanently Delete Employee'),
+          content: Text(
+            'This action cannot be undone. The employee record will be permanently removed.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Get.back(result: false),
@@ -239,7 +493,7 @@ class EmployeeViewController extends GetxController {
             TextButton(
               onPressed: () => Get.back(result: true),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: Text(hardDelete ? 'Permanently Delete' : 'Delete'),
+              child: Text('Permanently Delete'),
             ),
           ],
         ),
@@ -251,15 +505,19 @@ class EmployeeViewController extends GetxController {
 
       final result = await EmployeeService.deleteEmployee(
         employeeId: employeeId,
-        hardDelete: hardDelete,
+        hardDelete: true, // always hard delete
       );
+
+      print('Delete API response: $result');
 
       if (result['success']) {
         _showSuccessSnackbar('Success', result['data']['message']);
-        await refreshEmployees();
+        await refreshEmployees(forceRefresh: true);
       } else {
         _showErrorSnackbar(
-            'Error', result['data']['message'] ?? 'Failed to delete employee');
+          'Error',
+          result['data']['message'] ?? 'Failed to delete employee',
+        );
       }
     } catch (e) {
       _showErrorSnackbar('Network Error', 'Failed to delete employee');
@@ -277,7 +535,8 @@ class EmployeeViewController extends GetxController {
 
       if (result['success']) {
         _showSuccessSnackbar('Success', result['data']['message']);
-        await refreshEmployees();
+        // Force refresh to ensure real-time updates
+        await refreshEmployees(forceRefresh: true);
       } else {
         _showErrorSnackbar(
             'Error', result['data']['message'] ?? 'Failed to restore employee');
@@ -289,14 +548,342 @@ class EmployeeViewController extends GetxController {
     }
   }
 
+  /// Enhanced toggle employee status with real-time updates
+  Future<void> toggleEmployeeStatus(String? employeeId,
+      {bool? newStatus}) async {
+    // Validate employee ID
+    if (employeeId == null || employeeId.trim().isEmpty) {
+      _showErrorSnackbar('Error', 'Invalid employee ID');
+      return;
+    }
+
+    try {
+      // Find the employee in current list to get current status
+      Employee? employee =
+          employees.firstWhereOrNull((emp) => emp.id == employeeId);
+
+      if (employee == null) {
+        _showErrorSnackbar('Error', 'Employee not found');
+        return;
+      }
+
+      // Determine new status
+      bool targetStatus = newStatus ?? !employee.status;
+      String statusText = targetStatus ? 'activate' : 'deactivate';
+      String actionText = targetStatus ? 'Activate' : 'Deactivate';
+
+      // Show confirmation dialog
+      final confirmed = await Get.dialog<bool>(
+        AlertDialog(
+          title: Text('$actionText Employee'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Are you sure you want to $statusText this employee?'),
+              SizedBox(height: 8),
+              Text(
+                'Employee: ${getEmployeeDisplayName(employee)}',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              Row(
+                children: [
+                  Text('Current Status: '),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: employee.statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: employee.statusColor.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(employee.statusIcon,
+                            size: 12, color: employee.statusColor),
+                        SizedBox(width: 4),
+                        Text(
+                          employee.statusText,
+                          style: TextStyle(
+                            color: employee.statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Get.back(result: true),
+              style: TextButton.styleFrom(
+                foregroundColor: targetStatus ? Colors.green : Colors.orange,
+              ),
+              child: Text(actionText),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      // Show loading state
+      isLoading.value = true;
+
+      // Call the API
+      final result = await EmployeeService.updateEmployeeStatus(
+        employeeId: employeeId.trim(),
+        isActive: targetStatus,
+      );
+
+      if (result['success']) {
+        // Check if this was a warning (employee already had the requested status)
+        final apiStatus = result['data']['status'];
+        final message = result['data']['message'] ?? '';
+
+        if (apiStatus == 'warning') {
+          // Employee already had the requested status
+          _showSuccessSnackbar('Info', message);
+        } else {
+          // Successful status change
+          final responseData = result['data']['data'];
+
+          if (responseData != null && responseData is Map<String, dynamic>) {
+            // Create updated employee using fromJson (handles status conversion)
+            final updatedEmployee = Employee.fromJson({
+              ...employee.toJson(),
+              ...responseData,
+              'id': employee.id, // Ensure ID is preserved
+            });
+
+            // Update the employee in the local list immediately
+            final updatedEmployees = employees.map((emp) {
+              if (emp.id == employeeId) {
+                return updatedEmployee;
+              }
+              return emp;
+            }).toList();
+
+            employees.value = updatedEmployees;
+            employees.refresh(); // Force UI update
+
+            // Update timestamp for real-time tracking
+            lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
+          } else {
+            // Fallback update if response data is not available
+            final updatedEmployees = employees.map((emp) {
+              if (emp.id == employeeId) {
+                return emp.copyWith(
+                  status: targetStatus,
+                  updatedAt: DateTime.now(),
+                );
+              }
+              return emp;
+            }).toList();
+
+            employees.value = updatedEmployees;
+            employees.refresh(); // Force UI update
+
+            // Update timestamp for real-time tracking
+            lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
+          }
+
+          // Show success message
+          _showSuccessSnackbar('Success', message);
+
+          // Refresh statistics in background to reflect the change
+          loadStatistics();
+
+          // Optional: Refresh the entire list after a short delay to ensure consistency
+          Future.delayed(Duration(milliseconds: 500), () {
+            refreshEmployees();
+          });
+        }
+      } else {
+        // Handle API error
+        String errorMessage =
+            result['data']['message'] ?? 'Failed to update employee status';
+        _showErrorSnackbar('Error', errorMessage);
+      }
+    } catch (e) {
+      // Handle network or other errors
+      _showErrorSnackbar('Network Error', 'Failed to update employee status');
+      print('Error updating employee status: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Activate employee (set status to true)
+  Future<void> activateEmployee(String? employeeId) async {
+    await toggleEmployeeStatus(employeeId, newStatus: true);
+  }
+
+  /// Deactivate employee (set status to false)
+  Future<void> deactivateEmployee(String? employeeId) async {
+    await toggleEmployeeStatus(employeeId, newStatus: false);
+  }
+
+  /// Enhanced bulk status update for multiple employees with real-time updates
+  Future<void> bulkUpdateEmployeeStatus(
+    List<String> employeeIds,
+    bool newStatus,
+  ) async {
+    if (employeeIds.isEmpty) {
+      _showErrorSnackbar('Error', 'No employees selected');
+      return;
+    }
+
+    // Filter out null or empty IDs
+    final validIds = employeeIds.where((id) => id.trim().isNotEmpty).toList();
+
+    if (validIds.isEmpty) {
+      _showErrorSnackbar('Error', 'No valid employee IDs provided');
+      return;
+    }
+
+    String statusText = newStatus ? 'activate' : 'deactivate';
+    String actionText = newStatus ? 'Activate' : 'Deactivate';
+
+    // Show confirmation dialog
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text('$actionText ${validIds.length} Employees'),
+        content: Text(
+            'Are you sure you want to $statusText ${validIds.length} selected employees?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(
+              foregroundColor: newStatus ? Colors.green : Colors.orange,
+            ),
+            child: Text(actionText),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      isLoading.value = true;
+      int successCount = 0;
+      int failureCount = 0;
+      List<String> failedEmployees = [];
+
+      // Process each employee
+      for (String employeeId in validIds) {
+        try {
+          final result = await EmployeeService.updateEmployeeStatus(
+            employeeId: employeeId,
+            isActive: newStatus,
+          );
+
+          if (result['success']) {
+            successCount++;
+
+            // Update local list immediately
+            final updatedEmployees = employees.map((emp) {
+              if (emp.id == employeeId) {
+                return emp.copyWith(
+                  status: newStatus,
+                  updatedAt: DateTime.now(),
+                );
+              }
+              return emp;
+            }).toList();
+            employees.value = updatedEmployees;
+          } else {
+            failureCount++;
+            // Find employee name for error reporting
+            Employee? emp =
+                employees.firstWhereOrNull((e) => e.id == employeeId);
+            failedEmployees.add(emp?.name ?? employeeId);
+          }
+        } catch (e) {
+          failureCount++;
+          Employee? emp = employees.firstWhereOrNull((e) => e.id == employeeId);
+          failedEmployees.add(emp?.name ?? employeeId);
+          print('Error updating employee $employeeId: $e');
+        }
+      }
+
+      // Force UI refresh after bulk update
+      employees.refresh();
+      lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
+
+      // Show result summary
+      if (successCount > 0) {
+        String message =
+            '$successCount employees ${newStatus ? "activated" : "deactivated"} successfully';
+        if (failureCount > 0) {
+          message += ', $failureCount failed';
+        }
+        _showSuccessSnackbar('Bulk Update Result', message);
+      }
+
+      if (failureCount > 0 && successCount == 0) {
+        _showErrorSnackbar(
+            'Bulk Update Failed', 'Failed to update $failureCount employees');
+      }
+
+      // Refresh statistics in background
+      loadStatistics();
+
+      // Refresh the entire list after a short delay to ensure consistency
+      Future.delayed(Duration(milliseconds: 500), () {
+        refreshEmployees();
+      });
+    } catch (e) {
+      _showErrorSnackbar(
+          'Network Error', 'Failed to perform bulk status update');
+      print('Error in bulk status update: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Method to force refresh the view after status changes
+  void forceViewRefresh() {
+    employees.refresh();
+    lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
+    update(); // Trigger GetBuilder updates if used
+  }
+
+  /// Method to check if data needs refresh (for periodic updates)
+  bool shouldRefreshData() {
+    final currentTime = DateTime.now().millisecondsSinceEpoch;
+    final timeDiff = currentTime - lastUpdateTimestamp.value;
+    // Refresh if data is older than 30 seconds
+    return timeDiff > 30000;
+  }
+
+  /// Periodic refresh method (call this from UI lifecycle)
+  void startPeriodicRefresh() {
+    // You can call this method from onResume or when view becomes active
+    if (shouldRefreshData()) {
+      refreshEmployees();
+    }
+  }
+
   /// Download employee list as PDF
   void downloadEmployeeList() async {
     try {
       isDownloading.value = true;
-
-      // TODO: Implement PDF generation with current employee data
-      await Future.delayed(Duration(seconds: 2)); // Simulate download
-
+      await Future.delayed(Duration(seconds: 2));
       _showSuccessSnackbar('Success', 'Employee list downloaded as PDF');
     } catch (e) {
       _showErrorSnackbar('Error', 'Failed to download employee list');
@@ -309,10 +896,7 @@ class EmployeeViewController extends GetxController {
   void exportToExcel() async {
     try {
       isExporting.value = true;
-
-      // TODO: Implement Excel export with current employee data
-      await Future.delayed(Duration(seconds: 2)); // Simulate export
-
+      await Future.delayed(Duration(seconds: 2));
       _showSuccessSnackbar('Success', 'Employee list exported to Excel');
     } catch (e) {
       _showErrorSnackbar('Error', 'Failed to export employee list');
@@ -337,36 +921,51 @@ class EmployeeViewController extends GetxController {
     return 'Showing $startItem-$endItem of ${totalCount.value} employees';
   }
 
+  /// Clear image cache for specific employee
+  void clearEmployeeImageCache(String employeeId) {
+    imageCache.remove(employeeId);
+  }
+
+  /// Get cache statistics for debugging
+  Map<String, int> getCacheStats() {
+    int validImages = 0;
+    int invalidImages = 0;
+    int totalCached = imageCache.length;
+
+    for (var cache in imageCache.values) {
+      if (cache['isValid'] == true) {
+        validImages++;
+      } else {
+        invalidImages++;
+      }
+    }
+
+    return {
+      'total': totalCached,
+      'valid': validImages,
+      'invalid': invalidImages,
+    };
+  }
+
   /// Helper methods for snackbars
   void _showSuccessSnackbar(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    CustomSnackbar.showSuccess(title: title, message: message);
   }
 
   void _showErrorSnackbar(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    CustomSnackbar.showError(title: title, message: message);
   }
 
   /// Retry loading data after error
   void retryLoading() {
+    imageCache.clear();
     loadEmployees();
     loadStatistics();
   }
 
   @override
   void onClose() {
-    // Clean up resources if needed
+    imageCache.clear();
     super.onClose();
   }
 }

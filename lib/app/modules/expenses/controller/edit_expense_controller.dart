@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,17 +89,10 @@ class EditExpenseController extends GetxController {
 
   // Helper method to show error and navigate back
   void _showErrorAndGoBack(String message) {
-    Get.snackbar(
-      'Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    CustomSnackbar.showError(title: 'Error', message: message);
     Get.back();
   }
 
-  // Load expense data using service
   // Load expense data using service
   Future<void> loadExpenseData() async {
     final id = expenseId.value;
@@ -111,15 +105,12 @@ class EditExpenseController extends GetxController {
       isLoading.value = true;
 
       final result = await _expenseService.getExpenseById(id);
-      print('Service result: $result'); // Debug log
 
       if (result['success'] == true) {
         final expenseData = result['data'];
-        print('Expense data to parse: $expenseData'); // Debug log
 
         if (expenseData != null) {
           final expense = ExpenseModel.fromJson(expenseData);
-          print('Created expense model: ${expense.toJson()}'); // Debug log
 
           currentExpense.value = expense;
           populateFormFields(expense);
@@ -144,7 +135,6 @@ class EditExpenseController extends GetxController {
     try {
       // Populate text controllers with null safety
       expNameController.text = expense.expenseName ?? '';
-      print('Set expense name: ${expNameController.text}');
       dateController.text = expense.expenseDate ?? '';
       descriptionController.text = expense.description ?? '';
       amountController.text = expense.amount?.toString() ?? '0';
@@ -174,13 +164,7 @@ class EditExpenseController extends GetxController {
       // Store original expense data for comparison
       originalExpense = expense;
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to populate form data: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     }
   }
 
@@ -198,10 +182,7 @@ class EditExpenseController extends GetxController {
       if (imageBytes != null) {
         image.value = imageBytes;
       }
-    } catch (e) {
-      print('Failed to load image: $e');
-      // Don't show snackbar for image loading failures as it's not critical
-    }
+    } catch (e) {}
   }
 
   // Date picker
@@ -239,13 +220,7 @@ class EditExpenseController extends GetxController {
         image.value = bytes;
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to select image: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isUploading.value = false;
     }
@@ -300,135 +275,119 @@ class EditExpenseController extends GetxController {
 
   // Helper method for validation errors
   void _showValidationError(String message) {
-    Get.snackbar(
-      'Validation Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    CustomSnackbar.showError(title: 'Error', message: message);
   }
 
   // Update expense using service
   Future<void> updateExpense() async {
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  final id = expenseId.value;
-  final currentExp = currentExpense.value;
+    final id = expenseId.value;
+    final currentExp = currentExpense.value;
 
-  if (id == null || id.isEmpty) {
-    _showValidationError('Invalid expense ID');
-    return;
-  }
-
-  if (currentExp == null) {
-    _showValidationError('Current expense data not available');
-    return;
-  }
-
-  try {
-    isSaving.value = true;
-
-    // Create updated expense model with null safety
-    final updatedExpense = ExpenseModel(
-      id: currentExp.id,
-      expenseName: expNameController.text.trim(),
-      expenseDate: dateController.text.trim(),
-      expenseCategory: selectedCategoryTypes.value ?? '',
-      description: descriptionController.text.trim(),
-      amount: double.tryParse(amountController.text.trim()) ?? 0.0,
-      spentBy: spentByController.text.trim(),
-      modeOfPayment: selectedModeOfPayment.value ?? '',
-      expenseImageUrl: currentExp.expenseImageUrl,
-    );
-
-    // Call service method to update expense
-    final result = await _expenseService.updateExpense(
-      id: id,
-      expense: updatedExpense,
-      imageBytes: image.value,
-    );
-
-    // Debug print to see the actual response
-    print('Service response: $result');
-
-    // Check for success with multiple possible formats
-    bool isSuccess = false;
-    if (result != null) {
-      // Handle different response formats
-      if (result['success'] == true || 
-          result['success'] == 'true' ||
-          result['status'] == 'success' ||
-          result['status'] == true) {
-        isSuccess = true;
-      }
+    if (id == null || id.isEmpty) {
+      _showValidationError('Invalid expense ID');
+      return;
     }
 
-    if (isSuccess) {
-      // Update current expense with response data if available
-      final responseData = result['data'];
-      if (responseData != null) {
-        currentExpense.value = ExpenseModel.fromJson(responseData);
+    if (currentExp == null) {
+      _showValidationError('Current expense data not available');
+      return;
+    }
+
+    try {
+      isSaving.value = true;
+
+      // Create updated expense model with null safety
+      final updatedExpense = ExpenseModel(
+        id: currentExp.id,
+        expenseName: expNameController.text.trim(),
+        expenseDate: dateController.text.trim(),
+        expenseCategory: selectedCategoryTypes.value ?? '',
+        description: descriptionController.text.trim(),
+        amount: double.tryParse(amountController.text.trim()) ?? 0.0,
+        spentBy: spentByController.text.trim(),
+        modeOfPayment: selectedModeOfPayment.value ?? '',
+        expenseImageUrl: currentExp.expenseImageUrl,
+      );
+
+      // Call service method to update expense
+      final result = await _expenseService.updateExpense(
+        id: id,
+        expense: updatedExpense,
+        imageBytes: image.value,
+      );
+
+      // Debug print to see the actual response
+      print('Service response: $result');
+
+      // Check for success with multiple possible formats
+      bool isSuccess = false;
+      if (result != null) {
+        // Handle different response formats
+        if (result['success'] == true ||
+            result['success'] == 'true' ||
+            result['status'] == 'success' ||
+            result['status'] == true) {
+          isSuccess = true;
+        }
       }
 
-      // Stop loading before showing success message
+      if (isSuccess) {
+        // Update current expense with response data if available
+        final responseData = result['data'];
+        if (responseData != null) {
+          currentExpense.value = ExpenseModel.fromJson(responseData);
+        }
+
+        // Stop loading before showing success message
+        isSaving.value = false;
+
+        // Wait a bit to ensure UI is updated
+        await Future.delayed(Duration(milliseconds: 100));
+
+        // Show success message with longer duration
+        Get.snackbar(
+          'Success',
+          result['message'] ?? 'Expense updated successfully',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: Duration(seconds: 3),
+          margin: EdgeInsets.all(16),
+          borderRadius: 8,
+          isDismissible: true,
+          dismissDirection: DismissDirection.horizontal,
+          forwardAnimationCurve: Curves.easeOutBack,
+          reverseAnimationCurve: Curves.easeInBack,
+        );
+        CustomSnackbar.showSuccess(
+          title: 'Success',
+          message: result['message'] ?? 'Expense updated successfully',
+        );
+
+        // Wait for snackbar to show before navigating
+        await Future.delayed(Duration(milliseconds: 1500));
+
+        // Navigate back with success result
+        Get.offAllNamed(Routes.EXPENSES, arguments: true);
+      } else {
+        // Handle error case
+
+        CustomSnackbar.showError(
+          title: 'Error',
+          message: result['message'] ?? 'Failed to update expense',
+        );
+      }
+    } catch (e) {
+      CustomSnackbar.showError(
+        title: 'Error',
+        message: 'Failed to update expense: ${e.toString()}',
+      );
+    } finally {
       isSaving.value = false;
-
-      // Wait a bit to ensure UI is updated
-      await Future.delayed(Duration(milliseconds: 100));
-
-      // Show success message with longer duration
-      Get.snackbar(
-        'Success',
-        result['message'] ?? 'Expense updated successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-        margin: EdgeInsets.all(16),
-        borderRadius: 8,
-        isDismissible: true,
-        dismissDirection: DismissDirection.horizontal,
-        forwardAnimationCurve: Curves.easeOutBack,
-        reverseAnimationCurve: Curves.easeInBack,
-      );
-
-      // Wait for snackbar to show before navigating
-      await Future.delayed(Duration(milliseconds: 1500));
-      
-      // Navigate back with success result
-      Get.offAllNamed(Routes.EXPENSES, arguments: true);
-      
-    } else {
-      // Handle error case
-      Get.snackbar(
-        'Error',
-        result?['message'] ?? 'Failed to update expense',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-        margin: EdgeInsets.all(16),
-        borderRadius: 8,
-      );
     }
-  } catch (e) {
-    print('Error updating expense: $e');
-    Get.snackbar(
-      'Error',
-      'Failed to update expense: ${e.toString()}',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: Duration(seconds: 3),
-      margin: EdgeInsets.all(16),
-      borderRadius: 8,
-    );
-  } finally {
-    isSaving.value = false;
   }
-}
-
 
   // Check if form data has changed
   bool hasDataChanged() {

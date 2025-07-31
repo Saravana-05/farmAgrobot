@@ -110,6 +110,12 @@ class HomeView extends GetView<HomeController> {
                       color: kTertiaryColor,
                       onTap: (controller.navigateToDashboard),
                     ),
+                    SmallCard(
+                      icon: Icons.account_balance_wallet,
+                      title: 'Wages',
+                      color: kTertiaryColor,
+                      onTap: (controller.navigateToWages),
+                    ),
                   ],
                 ),
               ),

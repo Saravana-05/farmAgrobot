@@ -213,7 +213,7 @@ class AddEmployee extends StatelessWidget {
                         radius: 50.0,
                         backgroundImage: controller.image.value != null
                             ? MemoryImage(controller.image.value!)
-                            : const AssetImage('assets/images/emp_avatar.jpg')
+                            : const AssetImage('assets/images/avatar.jpg')
                                 as ImageProvider,
                       ),
                     ),

@@ -28,6 +28,7 @@ dependencies:
   pdf: ^3.11.3
   path_provider: ^2.1.5
   permission_handler: ^12.0.1
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:
@@ -47,8 +48,16 @@ flutter:
         - assets/images/leaf.png
         - assets/images/2leaves.png
         - assets/images/exp_avatar.jpg
+        - assets/images/avatar.jpg
  
+
   fonts:
     - family: Work Sans
       fonts:
         - asset: assets/fonts/WorkSans-Regular.ttf
+
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/NotoSansTamil-Regular.ttf
+        - asset: assets/fonts/NotoSansTamil-Bold.ttf
+

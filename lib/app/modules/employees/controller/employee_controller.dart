@@ -5,6 +5,10 @@ class EmployeeController extends GetxController {
   // Observable variable for selected bottom navigation index
   final RxInt selectedIndex = 0.obs;
 
+  Future<void> refreshEmployees() async {
+    
+  }
+
   // Method to handle tab selection
   void onTabSelected(int index) {
     selectedIndex.value = index;
