@@ -5,28 +5,32 @@ import '../../core/values/app_colors.dart';
 
 class CustomElevatedButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
-  final RxBool isLoading;
-  
-  CustomElevatedButton({
+  final VoidCallback? onPressed; // Changed to nullable
+  final RxBool? isLoading;
+  final Color? backgroundColor;
+
+  const CustomElevatedButton({
     required this.text,
-    required this.onPressed,
-    RxBool? isLoading,
-    super.key,
-  }) : isLoading = isLoading ?? RxBool(false);
+    this.onPressed,
+    this.isLoading,
+    this.backgroundColor,
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final isLoadingValue = isLoading?.value ?? false;
+    
     return SizedBox(
       width: double.infinity,
-      child: Obx(() => ElevatedButton(
-        onPressed: isLoading.value ? null : onPressed,
+      child: ElevatedButton(
+        onPressed: isLoadingValue ? null : onPressed,
         style: ElevatedButton.styleFrom(
           foregroundColor: kLightColor,
-          backgroundColor: kSecondaryColor,
+          backgroundColor: backgroundColor,
           minimumSize: const Size(150.0, 50.0),
         ),
-        child: isLoading.value
+        child: isLoadingValue
             ? const SizedBox(
                 height: 20,
                 width: 20,
@@ -36,7 +40,7 @@ class CustomElevatedButton extends StatelessWidget {
                 ),
               )
             : Text(text),
-      )),
+      ),
     );
   }
 }

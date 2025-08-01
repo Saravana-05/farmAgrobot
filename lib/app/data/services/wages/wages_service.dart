@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:core';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../config/api.dart';
@@ -11,7 +12,7 @@ class WageService {
     required Map<String, dynamic> wageData,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/save_wage_data/');
+      final uri = Uri.parse(addWage);
 
       final response = await http.post(
         uri,
@@ -100,21 +101,67 @@ class WageService {
         queryParams['to_date'] = toDate;
       }
 
-      final uri = Uri.parse('$baseUrl/get_wage_list/').replace(
+      final uri = Uri.parse(viewWage).replace(
         queryParameters: queryParams,
       );
+
+      print('Making request to: $uri'); // Debug log
 
       final response = await http.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 30));
 
-      return {
-        'success': response.statusCode == 200,
-        'statusCode': response.statusCode,
-        'data': json.decode(response.body),
-      };
+      print('Response status: ${response.statusCode}'); // Debug log
+      print('Response body: ${response.body}'); // Debug log
+
+      // Check if response body is empty
+      if (response.body.isEmpty) {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'data': {
+            'status': 'error',
+            'message': 'Empty response from server'
+          },
+        };
+      }
+
+      // Try to decode JSON with better error handling
+      Map<String, dynamic> responseData;
+      try {
+        responseData = json.decode(response.body) as Map<String, dynamic>;
+      } catch (jsonError) {
+        print('JSON decode error: $jsonError');
+        print('Response body that failed to decode: ${response.body}');
+        
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'data': {
+            'status': 'error',
+            'message': 'Invalid response format from server'
+          },
+        };
+      }
+
+      // Check for successful response
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'statusCode': response.statusCode,
+          'data': responseData,
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'data': responseData,
+        };
+      }
+
     } on SocketException catch (e) {
+      print('Socket exception: $e');
       return {
         'success': false,
         'statusCode': 500,
@@ -124,6 +171,7 @@ class WageService {
         },
       };
     } on TimeoutException catch (e) {
+      print('Timeout exception: $e');
       return {
         'success': false,
         'statusCode': 500,
@@ -132,7 +180,18 @@ class WageService {
           'message': 'Request timeout. Please try again.'
         },
       };
+    } on FormatException catch (e) {
+      print('Format exception: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Invalid response format from server'
+        },
+      };
     } catch (e) {
+      print('General exception: $e');
       return {
         'success': false,
         'statusCode': 500,
@@ -147,7 +206,7 @@ class WageService {
   /// Get wage details by ID
   static Future<Map<String, dynamic>> getWageDetail(String wageId) async {
     try {
-      final uri = Uri.parse('$baseUrl/get_wage_detail/$wageId/');
+      final uri = Uri.parse(editWageUrl.replaceAll('{id}', wageId));
 
       final response = await http.get(
         uri,
@@ -285,7 +344,7 @@ class WageService {
     required Map<String, dynamic> wageData,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/edit_wage_data/$wageId/');
+      final uri = Uri.parse(updateEmployeeUrl.replaceAll('{id}', wageId));
 
       final response = await http.put(
         uri,
@@ -330,55 +389,123 @@ class WageService {
 
   /// Delete wage record
   static Future<Map<String, dynamic>> deleteWage(String id, {
-    required String wageId,
-    bool hardDelete = true,
+    String? wageId, // Not needed but keeping for backward compatibility
+    bool hardDelete = false, // Default to false as you mentioned
   }) async {
     try {
+      // Replace the {id} placeholder with the actual wage ID
+      String finalUrl = deleteWageUrl.replaceAll('{id}', id);
+      
+      // Since you don't need hard_delete parameter, we won't add any query parameters
+      // unless hardDelete is explicitly true
       final Map<String, String> queryParams = {};
-
       if (hardDelete) {
         queryParams['hard_delete'] = 'true';
       }
 
-      final uri = Uri.parse('$baseUrl/delete_wage/$wageId/').replace(
+      final uri = Uri.parse(finalUrl).replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
 
+      print('DELETE request URL: $uri'); // Debug log
+
       final response = await http.delete(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          // Add any authentication headers if needed
+          // 'Authorization': 'Bearer $token',
+        },
       ).timeout(Duration(seconds: 30));
 
+      print('DELETE response status: ${response.statusCode}'); // Debug log
+      print('DELETE response body: ${response.body}'); // Debug log
+
+      // Handle response body parsing
+      Map<String, dynamic> responseData = {};
+      
+      if (response.body.isNotEmpty) {
+        try {
+          responseData = json.decode(response.body);
+        } catch (jsonError) {
+          print('JSON decode error: $jsonError');
+          print('Response body that failed to parse: "${response.body}"');
+          
+          // If JSON parsing fails, create a response based on status code
+          responseData = {
+            'status': response.statusCode == 200 ? 'success' : 'error',
+            'message': response.statusCode == 200 
+                ? 'Wage deleted successfully' 
+                : 'Failed to delete wage - Invalid server response',
+          };
+        }
+      } else {
+        // Handle empty response body (common for DELETE operations)
+        responseData = {
+          'status': response.statusCode == 200 || response.statusCode == 204 ? 'success' : 'error',
+          'message': response.statusCode == 200 || response.statusCode == 204
+              ? 'Wage deleted successfully' 
+              : 'Failed to delete wage',
+        };
+      }
+
+      // Return success for both 200 and 204 status codes
+      bool isSuccess = response.statusCode == 200 || response.statusCode == 204;
+
       return {
-        'success': response.statusCode == 200,
+        'success': isSuccess,
         'statusCode': response.statusCode,
-        'data': json.decode(response.body),
+        'data': responseData,
       };
+      
     } on SocketException catch (e) {
+      print('Socket exception: $e');
       return {
         'success': false,
-        'statusCode': 500,
+        'statusCode': 0,
         'data': {
           'status': 'error',
           'message': 'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
+      print('Timeout exception: $e');
       return {
         'success': false,
-        'statusCode': 500,
+        'statusCode': 408,
         'data': {
           'status': 'error',
           'message': 'Request timeout. Please try again.'
         },
       };
-    } catch (e) {
+    } on FormatException catch (e) {
+      print('Format exception (JSON parsing): $e');
       return {
         'success': false,
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network error: ${e.toString()}'
+          'message': 'Invalid response format from server.'
+        },
+      };
+    } on HttpException catch (e) {
+      print('HTTP exception: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'HTTP error: ${e.message}'
+        },
+      };
+    } catch (e) {
+      print('Unexpected exception: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Unexpected error: ${e.toString()}'
         },
       };
     }

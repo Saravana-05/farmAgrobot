@@ -13,6 +13,9 @@ abstract class Routes {
   static const ADD_EMPLOYEE = _Paths.ADD_EMPLOYEE;
   static const EDIT_EMPLOYEE = _Paths.EDIT_EMPLOYEE;
   static const WAGES = _Paths.WAGES;
+  static const ADD_WAGES = _Paths.ADD_WAGES;
+  static const EDIT_WAGES = _Paths.EDIT_WAGES;
+  static const VIEW_WAGES = _Paths.VIEW_WAGES;
 }
 
 abstract class _Paths {
@@ -28,4 +31,8 @@ abstract class _Paths {
   static const ADD_EMPLOYEE = '/add_employee';
   static const EDIT_EMPLOYEE = '/edit_employee';
   static const WAGES = '/wages';
+  static const ADD_WAGES = '/add_wages';
+  static const EDIT_WAGES = '/edit_wages';
+  static const VIEW_WAGES = '/view_wages';
+
 }

@@ -5,6 +5,7 @@ import 'app/global_widgets/bottom_navigation/controller/bottom_navigation_contro
 import 'app/global_widgets/card_grid/controller/card_controller.dart';
 import 'app/modules/employees/controller/employee_controller.dart';
 import 'app/modules/expenses/controller/expense_controller.dart';
+import 'app/modules/wages/controller/wages_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app_binding.dart';
@@ -25,6 +26,7 @@ void main() async {
   Get.put(drawer_controller.DrawerController());
   Get.put(ExpensesController());
   Get.put(EmployeeController());
+  Get.put(WagesController());
   Get.put(ExpenseService());
 
   runApp(MyApp());
@@ -35,7 +37,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'Farm Agrobot',
-      initialRoute: AppPages.INITIAL, // This will be splash screen
+      initialRoute: AppPages.INITIAL, 
       getPages: AppPages.routes,
       initialBinding: AppBinding(),
       debugShowCheckedModeBanner: false,

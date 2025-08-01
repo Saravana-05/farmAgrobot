@@ -16,7 +16,7 @@ class WagesScreen extends GetView<wages_controller.WagesController> {
         title: 'Wages',
         showAddIcon: true,
         onAddPressed: () {
-          controller.navigateToEmployee();
+          controller.navigateToAddWages();
         },
       ),
       extendBodyBehindAppBar: false,

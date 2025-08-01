@@ -115,3 +115,10 @@ String? getSafeImageUrl(String? relativePath) {
   final url = getFullImageUrl(relativePath);
   return isValidImageUrl(url) ? url : null;
 }
+
+// Wages
+const String addWage = baseUrl + 'wages/';
+const String viewWage = baseUrl + 'wages/list/';
+const String deleteWageUrl = baseUrl + 'wages/{id}/delete/';
+const String updateWageUrl = baseUrl + 'wages/{id}/update/';
+const String editWageUrl = baseUrl + 'wages/{id}/';

@@ -13,6 +13,9 @@ import '../modules/home/binding/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/splash/views/splash_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
+import '../modules/wages/views/add_wages.dart';
+import '../modules/wages/views/edit_wages.dart';
+import '../modules/wages/views/view_wages.dart';
 import '../modules/wages/views/wages_screen.dart';
 
 
@@ -78,6 +81,21 @@ class AppPages {
     GetPage(
       name: _Paths.WAGES,
       page: () => WagesScreen(),   
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_WAGES,
+      page: () => AddWage(),   
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.VIEW_WAGES,
+      page: () => ViewWages(),   
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_WAGES,
+      page: () => EditWage(),   
       // binding: EditExpenseBinding(),
     ),
    

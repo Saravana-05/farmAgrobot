@@ -29,7 +29,7 @@ class WagesController extends GetxController {
   }
 
   // Method to handle add expense navigation
-  void navigateToEmployee() {
-    Get.toNamed(Routes.ADD_EMPLOYEE);
+  void navigateToAddWages() {
+    Get.toNamed(Routes.ADD_WAGES);
   }
 }

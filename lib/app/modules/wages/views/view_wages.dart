@@ -6,7 +6,6 @@ import '../../../data/models/wages/wages_model.dart';
 import '../../../routes/app_pages.dart';
 import '../controller/view_wages_controller.dart';
 
-
 class ViewWages extends StatelessWidget {
   final WagesViewController controller = Get.put(WagesViewController());
 
@@ -246,7 +245,7 @@ class ViewWages extends StatelessWidget {
                         ),
                       ),
 
-                      // Three Dots Menu
+                      // Three Dots Menu - FIXED VERSION
                       PopupMenuButton<String>(
                         icon: Icon(Icons.more_vert, color: kSecondaryColor),
                         itemBuilder: (context) => [
@@ -286,18 +285,10 @@ class ViewWages extends StatelessWidget {
                           ),
                         ],
                         onSelected: (value) {
-                          switch (value) {
-                            case 'view':
-                              _showWageDetailsDialog(wage);
-                              break;
-                            case 'edit':
-                              Get.toNamed(Routes.WAGES,
-                                  arguments: {'id': wage.id.toString()});
-                              break;
-                            case 'delete':
-                              _showDeleteConfirmation(wage);
-                              break;
-                          }
+                          // FIX: Use WidgetsBinding.instance.addPostFrameCallback to defer navigation
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _handleMenuAction(value, wage);
+                          });
                         },
                       ),
                     ],
@@ -315,6 +306,22 @@ class ViewWages extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  // NEW: Separate method to handle menu actions
+  void _handleMenuAction(String action, Wage wage) {
+    switch (action) {
+      case 'view':
+        _showWageDetailsDialog(wage);
+        break;
+      case 'edit':
+        // Use the correct argument format that your controller expects
+        Get.toNamed(Routes.EDIT_WAGES, arguments: {'wageId': wage.id.toString()});
+        break;
+      case 'delete':
+        _showDeleteConfirmation(wage);
+        break;
+    }
   }
 
   Widget _buildPaginationControls() {
@@ -505,8 +512,11 @@ class ViewWages extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Get.back();
-                          Get.toNamed(Routes.WAGES,
-                              arguments: {'id': wage.id.toString()});
+                          // FIX: Use WidgetsBinding here too for consistency
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            Get.toNamed(Routes.EDIT_WAGES,
+                                arguments: {'wageId': wage.id.toString()});
+                          });
                         },
                         icon: Icon(Icons.edit),
                         label: Text('Edit'),
