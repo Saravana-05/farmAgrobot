@@ -1,8 +1,8 @@
 
-import 'package:farm_agrobot/app/data/models/wages/wages_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../attendance/views/attendance.dart';
 import '../../employees/views/employee_screen.dart';
 import '../../expenses/views/expense_screen.dart';
 import '../../wages/views/wages_screen.dart';
@@ -75,6 +75,9 @@ class HomeController extends GetxController {
 
   void navigateToWages() {
     Get.to(() => WagesScreen());
+  }
+  void navigateToAttendance() {
+    Get.to(() => AttendanceScreen());
   }
 
   // void navigateToAttendance() {

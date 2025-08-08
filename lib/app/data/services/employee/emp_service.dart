@@ -84,7 +84,7 @@ class EmployeeService {
     String? search,
     String? empType,
     String? gender,
-    bool? isActive,
+    bool? isActive,  bool? active,
   }) async {
     try {
       final Map<String, String> queryParams = {

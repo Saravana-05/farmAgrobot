@@ -72,7 +72,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.present_to_all,
                       title: 'Attendance',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToAttendance),
                     ),
                     SmallCard(
                       icon: Icons.energy_savings_leaf,

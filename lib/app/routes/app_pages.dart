@@ -1,4 +1,8 @@
+import 'package:farm_agrobot/app/modules/attendance/controller/attendance_controller.dart';
 import 'package:get/get.dart';
+import '../modules/attendance/binding/employee_detail_binding.dart';
+import '../modules/attendance/views/attendance.dart';
+import '../modules/attendance/views/employee_details_page.dart';
 import '../modules/employees/views/add_employee.dart';
 import '../modules/employees/views/edit_employee_screen.dart';
 import '../modules/employees/views/employee_screen.dart';
@@ -18,86 +22,92 @@ import '../modules/wages/views/edit_wages.dart';
 import '../modules/wages/views/view_wages.dart';
 import '../modules/wages/views/wages_screen.dart';
 
-
-
 part 'app_routes.dart';
 
 class AppPages {
   AppPages._();
-  
+
   static const INITIAL = Routes.SPLASH;
-  
+
   static final routes = [
     GetPage(
       name: _Paths.SPLASH,
       page: () => SplashView(),
       binding: SplashBinding(),
     ),
-     GetPage(
+    GetPage(
       name: _Paths.HOME,
       page: () => HomeView(),
       binding: HomeBinding(),
     ),
-     GetPage(
+    GetPage(
       name: _Paths.EXPENSES,
       page: () => ExpensesScreen(),
-      
     ),
     GetPage(
       name: _Paths.ADD_EXPENSES,
-      page: () => AddExpenses(),   
+      page: () => AddExpenses(),
       binding: InitialBinding(),
     ),
     GetPage(
       name: _Paths.EDIT_EXPENSE,
-      page: () => EditExpense(),   
+      page: () => EditExpense(),
       binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.VIEW_EXPENSE,
-      page: () => ViewExpenses(),   
+      page: () => ViewExpenses(),
       binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.EMPLOYEE,
-      page: () => EmployeeScreen(),   
+      page: () => EmployeeScreen(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.VIEW_EMPLOYEE,
-      page: () => ViewEmployees(),   
+      page: () => ViewEmployees(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.ADD_EMPLOYEE,
-      page: () => AddEmployee(),   
+      page: () => AddEmployee(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.EDIT_EMPLOYEE,
-      page: () => EditEmployee(),   
+      page: () => EditEmployee(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.WAGES,
-      page: () => WagesScreen(),   
+      page: () => WagesScreen(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.ADD_WAGES,
-      page: () => AddWage(),   
+      page: () => AddWage(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.VIEW_WAGES,
-      page: () => ViewWages(),   
+      page: () => ViewWages(),
       // binding: EditExpenseBinding(),
     ),
     GetPage(
       name: _Paths.EDIT_WAGES,
-      page: () => EditWage(),   
+      page: () => EditWage(),
       // binding: EditExpenseBinding(),
     ),
-   
+    GetPage(
+      name: _Paths.ATTENDANCE,
+      page: () => AttendanceScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EMPLOYEE_DETAILS,
+      page: () => EmployeeDetailsPage(),
+      binding: EmployeeDetailsBinding(),
+    ),
   ];
 }

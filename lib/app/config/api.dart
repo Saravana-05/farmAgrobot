@@ -1,5 +1,5 @@
-const String baseUrl = 'http://192.168.0.114:8000/api/';
-const String baseImgUrl = 'http://192.168.0.114:8000';
+const String baseUrl = 'http://192.168.0.111:8000/api/';
+const String baseImgUrl = 'http://192.168.0.111:8000';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';
@@ -122,3 +122,21 @@ const String viewWage = baseUrl + 'wages/list/';
 const String deleteWageUrl = baseUrl + 'wages/{id}/delete/';
 const String updateWageUrl = baseUrl + 'wages/{id}/update/';
 const String editWageUrl = baseUrl + 'wages/{id}/';
+
+// ============= ATTENDANCE =============
+
+// Daily Attendance
+const String createDailyAttendanceUrl = baseUrl + 'mark-attendance/';
+const String getAttendanceListUrl = baseUrl + 'weekly-data/';
+
+// Additional Attendance URLs
+const String getAttendanceUrl = baseUrl + 'attendance/{date_str}/';
+const String updateAttendanceUrl = baseUrl + 'attendance/{date_str}/update/';
+const String updateSingleAttendanceUrl = baseUrl + 'update-single-attendance/';
+
+// ============= WAGE MANAGEMENT =============
+const String payWagesUrl = baseUrl + 'pay-wages/';
+const String wageSummaryUrl = baseUrl + 'wage-summary/';
+
+// ============= EXPORT =============
+const String exportAttendanceUrl = baseUrl + 'export-attendance/';

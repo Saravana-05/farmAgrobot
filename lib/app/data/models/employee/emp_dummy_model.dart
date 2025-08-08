@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 class Employee {
   final String id;
   final String name;
-  final String tamilName;
-  final String empType;
-  final String gender;
-  final String contact;
-  final DateTime joiningDate;
+  final String? tamilName;
+  final String? empType;
+  final String wages;
+  final String? gender;
+  final String? contact;
+  final DateTime? joiningDate;
   final bool status;
   final String? imageUrl;
   final DateTime? createdAt;
@@ -16,15 +17,15 @@ class Employee {
   Employee({
     required this.id,
     required this.name,
-    required this.tamilName,
-    required this.empType,
-    required this.gender,
-    required this.contact,
-    required this.joiningDate,
-    required this.status,
+     this.tamilName,
+     this.empType,
+     this.gender,
+     this.contact,
+     this.joiningDate,
+     required this.status,
     this.imageUrl,
     this.createdAt,
-    this.updatedAt,
+    this.updatedAt, required this.wages, 
   });
 
   /// Create Employee from JSON (API response) with proper status conversion
@@ -65,7 +66,7 @@ class Employee {
           : null,
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at']) 
-          : null,
+          : null, wages: '',
     );
   }
 
@@ -77,7 +78,7 @@ class Employee {
       'emp_type': empType,
       'gender': gender,
       'contact': contact,
-      'joining_date': joiningDate.toIso8601String().split('T')[0], // YYYY-MM-DD format
+      'joining_date': joiningDate?.toIso8601String().split('T')[0], // YYYY-MM-DD format
       'status': status ? 1 : 0, // Convert boolean to integer for backend
     };
   }
@@ -114,15 +115,15 @@ class Employee {
       status: status ?? this.status,
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      updatedAt: updatedAt ?? this.updatedAt, wages: '',
     );
   }
 
   /// Get formatted joining date
   String get formattedJoiningDate {
-    return '${joiningDate.day.toString().padLeft(2, '0')}/'
-           '${joiningDate.month.toString().padLeft(2, '0')}'
-           '${joiningDate.year}';
+    return '${joiningDate?.day.toString().padLeft(2, '0')}/'
+           '${joiningDate?.month.toString().padLeft(2, '0')}'
+           '${joiningDate?.year}';
   }
 
   /// Get status text
@@ -141,8 +142,8 @@ class Employee {
   }
 
   /// Get employee type display text
-  String get empTypeDisplay {
-    switch (empType.toLowerCase()) {
+  String? get empTypeDisplay {
+    switch (empType?.toLowerCase()) {
       case 'regular':
         return 'Regular';
       case 'contract':
@@ -155,8 +156,8 @@ class Employee {
   }
 
   /// Get gender display text
-  String get genderDisplay {
-    switch (gender.toLowerCase()) {
+  String? get genderDisplay {
+    switch (gender?.toLowerCase()) {
       case 'male':
         return 'Male';
       case 'female':

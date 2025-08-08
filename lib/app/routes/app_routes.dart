@@ -16,6 +16,11 @@ abstract class Routes {
   static const ADD_WAGES = _Paths.ADD_WAGES;
   static const EDIT_WAGES = _Paths.EDIT_WAGES;
   static const VIEW_WAGES = _Paths.VIEW_WAGES;
+  static const VIEW_ATTENDANCE = _Paths.VIEW_ATTENDANCE;
+  static const CREATE_ATTENDANCE = _Paths.CREATE_ATTENDANCE;
+  static const EDIT_ATTENDANCE = _Paths.EDIT_ATTENDANCE;
+  static const ATTENDANCE = _Paths.ATTENDANCE;
+  static const EMPLOYEE_DETAILS = _Paths.EMPLOYEE_DETAILS;
 }
 
 abstract class _Paths {
@@ -34,5 +39,9 @@ abstract class _Paths {
   static const ADD_WAGES = '/add_wages';
   static const EDIT_WAGES = '/edit_wages';
   static const VIEW_WAGES = '/view_wages';
-
+  static const VIEW_ATTENDANCE = '/view_attendance';
+  static const CREATE_ATTENDANCE = '/create_attendance';
+  static const EDIT_ATTENDANCE = '/edit_attendance';
+  static const ATTENDANCE = '/attendance';
+  static const EMPLOYEE_DETAILS = '/employee_details';
 }

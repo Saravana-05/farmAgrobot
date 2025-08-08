@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'app/data/services/attendance/attendance_service.dart';
 import 'app/data/services/expenses/expense_service.dart';
 import 'app/global_widgets/bottom_navigation/controller/bottom_navigation_controller.dart';
 import 'app/global_widgets/card_grid/controller/card_controller.dart';
+import 'app/modules/attendance/controller/attendance_controller.dart';
 import 'app/modules/employees/controller/employee_controller.dart';
 import 'app/modules/expenses/controller/expense_controller.dart';
 import 'app/modules/wages/controller/wages_controller.dart';
@@ -28,6 +30,8 @@ void main() async {
   Get.put(EmployeeController());
   Get.put(WagesController());
   Get.put(ExpenseService());
+  Get.put(AttendanceService());
+  Get.put(AttendanceController());
 
   runApp(MyApp());
 }
