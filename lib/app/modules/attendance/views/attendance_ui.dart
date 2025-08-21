@@ -1,8 +1,8 @@
-import 'package:farm_agrobot/app/data/models/employee/emp_dummy_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../core/values/app_colors.dart';
+import '../../../data/models/attendance/attendance_record_model.dart';
 import '../../../routes/app_pages.dart';
 import '../controller/attendance_UI_controller.dart';
 import '../controller/employee_detail_controller.dart';
@@ -222,84 +222,203 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
+  // FIXED: Updated wages summary to properly handle individual payments
   Widget _buildWagesSummaryAndActions(AttendanceUIController controller) {
+    // Calculate total paid amount across all employees
+    double totalPaidAmount = 0.0;
+    for (var employee in controller.employees) {
+      totalPaidAmount += controller.getPartialPayment(employee.id);
+    }
+
+    // Calculate remaining amount
+    double remainingAmount = controller.grandTotalWages.value - totalPaidAmount;
+
+    // FIXED: Check if ALL employees are fully paid (no remaining amounts)
+    bool allEmployeesPaid = controller.employees.isNotEmpty &&
+        controller.employees.every(
+            (employee) => controller.getRemainingAmount(employee.id) <= 0);
+
+    // FIXED: Check if there are any employees with remaining amounts > 0
+    bool hasUnpaidEmployees = controller.employees
+        .any((employee) => controller.getRemainingAmount(employee.id) > 0);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: Text(
-              'Total Wages: ₹${controller.grandTotalWages.value.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: kPrimaryColor,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (!controller.wagesPaid.value)
-            ElevatedButton.icon(
-              onPressed: () => _showPayWagesDialog(controller),
-              icon: const Icon(Icons.money, color: kPrimaryColor, size: 14),
-              label: const Text(
-                'Pay Wages',
-                style: TextStyle(color: kPrimaryColor, fontSize: 11),
-              ),
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minimumSize: const Size(0, 32),
-                backgroundColor: Colors.white,
-                elevation: 1,
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.info, color: kPrimaryColor, size: 18),
-              tooltip: 'Wages already paid for this week.',
-              onPressed: () {
-                Get.dialog(
-                  AlertDialog(
-                    title: const Text("Info"),
-                    content: const Text(
-                        "Wages have already been paid for this week."),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Get.back(),
-                        child: const Text("OK"),
+          // Total wages info with breakdown
+          Card(
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Wages: ₹${controller.grandTotalWages.value.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimaryColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (totalPaidAmount > 0) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Paid: ₹${totalPaidAmount.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              // FIXED: Only show remaining if there are actually unpaid employees
+                              if (hasUnpaidEmployees && remainingAmount > 0)
+                                Text(
+                                  'Remaining: ₹${remainingAmount.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ],
+                        ),
                       ),
+                      // Progress indicator for payment completion
+                      if (controller.grandTotalWages.value > 0)
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Stack(
+                            children: [
+                              CircularProgressIndicator(
+                                value: totalPaidAmount /
+                                    controller.grandTotalWages.value,
+                                backgroundColor: Colors.grey.shade300,
+                                valueColor:
+                                    const AlwaysStoppedAnimation(kPrimaryColor),
+                                strokeWidth: 3,
+                              ),
+                              Center(
+                                child: Text(
+                                  '${((totalPaidAmount / controller.grandTotalWages.value) * 100).toInt()}%',
+                                  style: const TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          const SizedBox(width: 6),
-          ElevatedButton.icon(
-            onPressed: controller.fetchWageSummary,
-            icon: const Icon(Icons.picture_as_pdf,
-                color: kPrimaryColor, size: 14),
-            label: const Text(
-              'PDF',
-              style: TextStyle(color: kPrimaryColor, fontSize: 11),
-            ),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: const Size(0, 32),
-              backgroundColor: Colors.white,
-              elevation: 1,
-            ),
+          ),
+          const SizedBox(height: 8),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(), // Empty space to push buttons to right
+              ),
+              // FIXED: Show pay remaining button only when there are unpaid employees
+              if (hasUnpaidEmployees && remainingAmount > 0)
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      _showPayWagesDialog(controller, remainingAmount),
+                  icon: const Icon(Icons.money, color: kPrimaryColor, size: 14),
+                  label: Text(
+                    totalPaidAmount > 0 ? 'Pay Remaining' : 'Pay Wages',
+                    style: const TextStyle(color: kPrimaryColor, fontSize: 11),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 32),
+                    backgroundColor: Colors.white,
+                    elevation: 1,
+                  ),
+                )
+              // FIXED: Show "All Wages Paid" only when ALL employees are fully paid AND there are employees
+              else if (allEmployeesPaid && controller.employees.isNotEmpty)
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.green, size: 18),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'All Wages Paid',
+                      style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                )
+              // Show nothing if no employees
+              else if (controller.employees.isEmpty)
+                const Text(
+                  'No employees found',
+                  style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+              const SizedBox(width: 6),
+              ElevatedButton.icon(
+                onPressed: controller.fetchWageSummary,
+                icon: const Icon(Icons.picture_as_pdf,
+                    color: kPrimaryColor, size: 14),
+                label: const Text(
+                  'PDF',
+                  style: TextStyle(color: kPrimaryColor, fontSize: 11),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: const Size(0, 32),
+                  backgroundColor: Colors.white,
+                  elevation: 1,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  void _showPayWagesDialog(AttendanceUIController controller) {
+  // FIXED: Updated pay wages dialog to handle remaining amounts properly
+  void _showPayWagesDialog(
+      AttendanceUIController controller, double remainingAmount) {
     Get.dialog(
       AlertDialog(
         title: const Text('Pay Wages Options'),
-        content: const Text('Choose how you want to pay wages:'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Remaining Amount: ₹${remainingAmount.toStringAsFixed(0)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text('Choose how you want to pay wages:'),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
@@ -312,16 +431,55 @@ class AttendanceUIScreen extends StatelessWidget {
             },
             child: const Text('Individual Payments'),
           ),
+          if (remainingAmount > 0)
+            ElevatedButton(
+              onPressed: () {
+                Get.back();
+                _showPayAllRemainingConfirmation(controller, remainingAmount);
+              },
+              child: Text(
+                  'Pay Remaining (₹${remainingAmount.toStringAsFixed(0)})'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // FIXED: New method to handle paying remaining amount
+  void _showPayAllRemainingConfirmation(
+      AttendanceUIController controller, double remainingAmount) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Confirm Payment'),
+        content: Text(
+            'Are you sure you want to pay the remaining wages totaling ₹${remainingAmount.toStringAsFixed(0)}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               Get.back();
-              _showPayAllConfirmation(controller);
+              _payRemainingWages(controller);
             },
-            child: const Text('Pay All'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
     );
+  }
+
+  void _payRemainingWages(AttendanceUIController controller) async {
+    // Make a copy to avoid modification issues
+    final employeesCopy = List.of(controller.employees);
+
+    for (var employee in employeesCopy) {
+      final remainingAmount = controller.getRemainingAmount(employee.id);
+      if (remainingAmount > 0) {
+        await controller.payEmployeeWages(employee.id, remainingAmount);
+      }
+    }
   }
 
   void _showPayAllConfirmation(AttendanceUIController controller) {
@@ -369,7 +527,7 @@ class AttendanceUIScreen extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final employee = controller.employees[index];
                       return _buildEmployeePaymentCard(
-                          controller, employee as Employee);
+                          controller, employee as EmployeeAttendanceRecord);
                     },
                   )),
             ),
@@ -385,7 +543,7 @@ class AttendanceUIScreen extends StatelessWidget {
   }
 
   Widget _buildEmployeePaymentCard(
-      AttendanceUIController controller, Employee employee) {
+      AttendanceUIController controller, EmployeeAttendanceRecord employee) {
     final paymentStatus = controller.getPaymentStatus(employee.id);
     final isPaid = paymentStatus == 'paid';
     final partialPayment = controller.getPartialPayment(employee.id);
@@ -613,8 +771,7 @@ class AttendanceUIScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    onTap: () =>
-                        _navigateToEmployeeDetails(employee as Employee),
+                    onTap: () => _navigateToEmployeeDetails(employee),
                   ),
 
                   // Attendance cells for each day of the week
@@ -781,11 +938,11 @@ class AttendanceUIScreen extends StatelessWidget {
                                 ],
                                 onSelected: (value) {
                                   if (value == 'partial') {
-                                    _showPartialPaymentDialog(controller,
-                                        employee as Employee, remainingAmount);
+                                    _showPartialPaymentDialog(
+                                        controller, employee, remainingAmount);
                                   } else if (value == 'full') {
-                                    _showPayFullConfirmation(controller,
-                                        employee as Employee, remainingAmount);
+                                    _showPayFullConfirmation(
+                                        controller, employee, remainingAmount);
                                   }
                                 },
                               ),
@@ -881,7 +1038,7 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-  void _navigateToEmployeeDetails(Employee employee) {
+  void _navigateToEmployeeDetails(employee) {
     try {
       // Clean up any existing controller before navigation
       if (Get.isRegistered<EmployeeDetailsController>()) {
@@ -902,7 +1059,7 @@ class AttendanceUIScreen extends StatelessWidget {
   }
 
   void _showPartialPaymentDialog(
-      AttendanceUIController controller, Employee employee, double maxAmount) {
+      AttendanceUIController controller, employee, double maxAmount) {
     final TextEditingController amountController = TextEditingController();
 
     Get.dialog(
@@ -947,13 +1104,14 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-// FIX 9: Updated pay full confirmation dialog
+// FIXED: Updated pay full confirmation dialog to use remaining amount
   void _showPayFullConfirmation(
-      AttendanceUIController controller, Employee employee, double amount) {
+      AttendanceUIController controller, employee, double remainingAmount) {
     Get.dialog(
       AlertDialog(
-        title: Text('Pay Full Wages - ${employee.name}'),
-        content: Text('Pay full amount of ₹${amount.toStringAsFixed(0)}?'),
+        title: Text('Pay Remaining Wages - ${employee.name}'),
+        content: Text(
+            'Pay remaining amount of ₹${remainingAmount.toStringAsFixed(0)}?'),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
@@ -962,7 +1120,7 @@ class AttendanceUIScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Get.back();
-              controller.payEmployeeWages(employee.id, amount);
+              controller.payEmployeeWages(employee.id, remainingAmount);
             },
             child: const Text('Pay'),
           ),
@@ -1194,12 +1352,8 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-  void _navigateWithCleanup(Employee employee) {
+  void _navigateWithCleanup(employee) {
     try {
-      // Clean up any existing controller before navigation
-      // Note: You need to import EmployeeDetailsController for this to work
-      // Get.delete<EmployeeDetailsController>(force: true);
-
       // Navigate with a delay to ensure clean state
       Future.microtask(() {
         Get.toNamed(Routes.EMPLOYEE_DETAILS, arguments: employee);

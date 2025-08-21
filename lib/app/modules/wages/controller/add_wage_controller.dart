@@ -13,7 +13,9 @@ class AddWageController extends GetxController {
   var isSaving = false.obs;
   var isLoadingEmployees = false.obs;
   var selectedIndex = 0.obs;
-  var selectedEmployee = Rxn<Employee>();
+
+  // Multiple employees selection
+  var selectedEmployees = <Employee>[].obs;
 
   // Add reactive variables for form updates
   var effectiveFromDate = ''.obs;
@@ -61,21 +63,59 @@ class AddWageController extends GetxController {
     super.onClose();
   }
 
-  /// Load employees for dropdown selection
+  // Multiselect employee methods
+  void addSelectedEmployee(Employee employee) {
+    if (!isEmployeeSelected(employee)) {
+      selectedEmployees.add(employee);
+      print("✅ Added employee: ${employee.name} (ID: ${employee.id})");
+      print("Total selected: ${selectedEmployees.length}");
+    }
+  }
+
+  void removeSelectedEmployee(Employee employee) {
+    selectedEmployees.removeWhere((emp) => emp.id == employee.id);
+    print("❌ Removed employee: ${employee.name} (ID: ${employee.id})");
+    print("Total selected: ${selectedEmployees.length}");
+  }
+
+  bool isEmployeeSelected(Employee employee) {
+    return selectedEmployees.any((emp) => emp.id == employee.id);
+  }
+
+  void selectAllEmployees() {
+    selectedEmployees.clear();
+    selectedEmployees.addAll(employees);
+    print("✅ Selected all ${employees.length} employees");
+  }
+
+  void clearAllSelectedEmployees() {
+    selectedEmployees.clear();
+    print("❌ Cleared all selected employees");
+  }
+
+  // Employee preview for multiselect
+  String get employeePreview {
+    if (selectedEmployees.isEmpty) {
+      return 'No employees selected';
+    } else if (selectedEmployees.length == 1) {
+      return selectedEmployees.first.name;
+    } else {
+      return '${selectedEmployees.length} employees selected';
+    }
+  }
+
+  /// Load employees for dropdown selection - Updated to fetch ALL employees
   Future<void> _loadEmployees() async {
     try {
       isLoadingEmployees.value = true;
+      print("Starting to load all employees...");
 
-      // Add proper error handling and debugging
-      print("Starting to load employees...");
-
-      Map<String, dynamic> result = await EmployeeService.getEmployeeList();
+      // Try to get all employees by setting a high limit or using pagination
+      Map<String, dynamic> result = await _getAllEmployeesWithPagination();
       print("API Result: $result");
 
-      // Add detailed debugging
       debugApiResponse(result);
 
-      // Check if result is null or empty
       if (result.isEmpty) {
         print("Error: Empty result from API");
         MessageService.to.showError(
@@ -83,16 +123,12 @@ class AddWageController extends GetxController {
         return;
       }
 
-      // More robust success checking
       bool isSuccess = result['success'] == true || result['success'] == 'true';
 
       if (isSuccess) {
-        // Handle the specific API structure: result['data']['data']['employees']
         List<dynamic> employeeData = [];
-
         print("Attempting to extract employees from nested structure...");
 
-        // Your API structure: result -> data -> data -> employees
         if (result['data'] != null && result['data'] is Map) {
           var outerData = result['data'] as Map<String, dynamic>;
           print("Outer data keys: ${outerData.keys}");
@@ -127,19 +163,16 @@ class AddWageController extends GetxController {
           return;
         }
 
-        // Convert and filter employees with better error handling
         List<Employee> validEmployees = [];
 
         for (var json in employeeData) {
           try {
             Employee emp = Employee.fromJson(json);
-            // Only add active employees
             if (emp.status == true) {
               validEmployees.add(emp);
             }
           } catch (e) {
             print("Error parsing employee: $json, Error: $e");
-            // Continue with other employees instead of failing completely
           }
         }
 
@@ -151,7 +184,6 @@ class AddWageController extends GetxController {
               .showError('no_active_employees', 'No active employees found');
         }
       } else {
-        // Handle API error response
         String errorMessage = 'Failed to load employees';
 
         if (result['message'] != null) {
@@ -170,7 +202,6 @@ class AddWageController extends GetxController {
       print('Exception in _loadEmployees: $e');
       print('Stack trace: ${StackTrace.current}');
 
-      // Provide more specific error messages
       String errorMessage = 'Error loading employees';
 
       if (e.toString().contains('SocketException') ||
@@ -190,14 +221,65 @@ class AddWageController extends GetxController {
     }
   }
 
-// Also add this method to manually refresh employees
+  /// Helper method to get all employees using pagination
+  Future<Map<String, dynamic>> _getAllEmployeesWithPagination() async {
+    List<dynamic> allEmployees = [];
+    int currentPage = 1;
+    int totalPages = 1;
+
+    do {
+      // Call your employee service with pagination
+      Map<String, dynamic> result = await EmployeeService.getEmployeeList(
+        page: currentPage,
+        limit: 100, // Fetch 100 at a time to reduce API calls
+      );
+
+      if (result['success'] == true) {
+        // Extract employees from current page
+        if (result['data'] != null && result['data']['data'] != null) {
+          var pageData = result['data']['data'];
+
+          if (pageData['employees'] != null) {
+            allEmployees.addAll(pageData['employees']);
+          }
+
+          // Check if there are more pages
+          if (pageData['pagination'] != null) {
+            totalPages = pageData['pagination']['total_pages'] ?? 1;
+            print(
+                "Page $currentPage of $totalPages loaded, ${pageData['employees']?.length ?? 0} employees");
+          } else {
+            // If no pagination info, assume this is the last page
+            break;
+          }
+        } else {
+          break;
+        }
+      } else {
+        // If any page fails, return the error
+        return result;
+      }
+
+      currentPage++;
+    } while (currentPage <= totalPages);
+
+    print("Total employees loaded across all pages: ${allEmployees.length}");
+
+    // Return in the same format as the original API response
+    return {
+      'success': true,
+      'data': {
+        'data': {'employees': allEmployees}
+      }
+    };
+  }
+
   Future<void> refreshEmployeesManually() async {
-    employees.clear(); // Clear existing data
-    selectedEmployee.value = null; // Reset selection
+    employees.clear();
+    selectedEmployees.clear();
     await _loadEmployees();
   }
 
-// Add this method to debug the exact API response structure
   void debugApiResponse(Map<String, dynamic> result) {
     print("=== DETAILED API RESPONSE DEBUG ===");
     print("Full result: $result");
@@ -223,10 +305,8 @@ class AddWageController extends GetxController {
     print("=== END DEBUG ===");
   }
 
-// Add this method to check employee service availability
   Future<bool> checkEmployeeServiceHealth() async {
     try {
-      // You might want to add a health check endpoint
       Map<String, dynamic> result = await EmployeeService.getEmployeeList();
       return result.isNotEmpty;
     } catch (e) {
@@ -248,7 +328,6 @@ class AddWageController extends GetxController {
       effectiveFromController.text = formattedDate;
       effectiveFromDate.value = formattedDate;
 
-      // Clear effective to date if it's before the new effective from date
       if (effectiveToController.text.isNotEmpty) {
         DateTime effectiveTo = DateTime.parse(effectiveToController.text);
         if (effectiveTo.isBefore(picked)) {
@@ -264,7 +343,6 @@ class AddWageController extends GetxController {
     DateTime initialDate = DateTime.now();
     DateTime firstDate = DateTime.now();
 
-    // Set minimum date based on effective from date
     if (effectiveFromController.text.isNotEmpty) {
       firstDate = DateTime.parse(effectiveFromController.text);
       if (firstDate.isAfter(initialDate)) {
@@ -292,11 +370,12 @@ class AddWageController extends GetxController {
     effectiveToDate.value = '';
   }
 
-  /// Validate form data
+  /// Validate form data for multiple employees
   bool _validateForm() {
-    // Employee validation
-    if (selectedEmployee.value == null) {
-      MessageService.to.showEmployeeValidationError();
+    // Employee validation - checks for multiple employees
+    if (selectedEmployees.isEmpty) {
+      MessageService.to
+          .showError('validation_error', 'Please select at least one employee');
       return false;
     }
 
@@ -339,101 +418,28 @@ class AddWageController extends GetxController {
     return true;
   }
 
-  /// Convert form data to request format
-  Map<String, dynamic> _wageToRequestData() {
-    print("=== BUILDING WAGE REQUEST DATA ===");
-
-    Map<String, dynamic> data = {};
-
-    // Debug the selected employee
-    print("selectedEmployee.value: ${selectedEmployee.value}");
-    print("selectedEmployee.value?.id: ${selectedEmployee.value?.id}");
-    print(
-        "selectedEmployee.value?.id type: ${selectedEmployee.value?.id.runtimeType}");
-
-    // Handle employee ID properly - use 'employee' instead of 'employee_id'
-    var employeeId = selectedEmployee.value!.id;
-    if (employeeId is String) {
-      // If it's a string, try to convert to int
-      var parsedId = int.tryParse(employeeId);
-      data['employee'] =
-          parsedId ?? employeeId; // Keep as string if parsing fails
-      print(
-          "Converted string ID '$employeeId' to: ${data['employee']} (${data['employee'].runtimeType})");
-    } else if (employeeId is int) {
-      data['employee'] = employeeId;
-      print(
-          "Using integer ID: ${data['employee']} (${data['employee'].runtimeType})");
-    } else {
-      data['employee'] = employeeId;
-      print(
-          "Using ID as-is: ${data['employee']} (${data['employee'].runtimeType})");
-    }
-
-    // Handle amount
-    var amountText = amountController.text.trim();
-    print("Amount text: '$amountText'");
-    data['amount'] = double.parse(amountText);
-    print("Parsed amount: ${data['amount']} (${data['amount'].runtimeType})");
-
-    // Handle effective from date
-    data['effective_from'] = effectiveFromController.text.trim();
-    print("Effective from: '${data['effective_from']}'");
-
-    // Handle optional effective to date
-    if (effectiveToController.text.trim().isNotEmpty) {
-      data['effective_to'] = effectiveToController.text.trim();
-      print("Effective to: '${data['effective_to']}'");
-    } else {
-      print("No effective to date");
-    }
-
-    // Handle optional remarks
-    if (remarksController.text.trim().isNotEmpty) {
-      data['remarks'] = remarksController.text.trim();
-      print("Remarks: '${data['remarks']}'");
-    } else {
-      print("No remarks");
-    }
-
-    // Remove null or empty values
-    int initialCount = data.length;
-    data.removeWhere(
-        (key, value) => value == null || (value is String && value.isEmpty));
-    int finalCount = data.length;
-
-    if (initialCount != finalCount) {
-      print("Removed ${initialCount - finalCount} null/empty values");
-    }
-
-    print("Final request data: $data");
-    print("=== END WAGE REQUEST DATA ===");
-
-    return data;
-  }
-
-// Also add this helper method to verify employee selection
+  // Verify employee selection for multiple employees
   bool isEmployeeProperlySelected() {
     print("=== EMPLOYEE SELECTION CHECK ===");
-    print("selectedEmployee.value: ${selectedEmployee.value}");
+    print("selectedEmployees.length: ${selectedEmployees.length}");
 
-    if (selectedEmployee.value == null) {
-      print("❌ No employee selected");
+    if (selectedEmployees.isEmpty) {
+      print("❌ No employees selected");
       return false;
     }
 
-    print("✅ Employee selected: ${selectedEmployee.value!.name}");
-    print(
-        "   ID: ${selectedEmployee.value!.id} (${selectedEmployee.value!.id.runtimeType})");
-    print("   Type: ${selectedEmployee.value!.empType}");
-    print("   Status: ${selectedEmployee.value!.status}");
-    print("=== END EMPLOYEE CHECK ===");
+    selectedEmployees.forEach((employee) {
+      print("✅ Employee selected: ${employee.name}");
+      print("   ID: ${employee.id} (${employee.id.runtimeType})");
+      print("   Type: ${employee.empType}");
+      print("   Status: ${employee.status}");
+    });
 
+    print("=== END EMPLOYEE CHECK ===");
     return true;
   }
 
-  /// Save wage record
-  /// Save wage record
+  /// Save wage record for multiple employees using the updated WageService
   void saveWage() async {
     if (isSaving.value) {
       print("Save already in progress, ignoring");
@@ -442,10 +448,10 @@ class AddWageController extends GetxController {
 
     print("=== STARTING WAGE SAVE PROCESS ===");
 
-    // First check if employee is properly selected
+    // First check if employees are properly selected
     if (!isEmployeeProperlySelected()) {
-      MessageService.to
-          .showError('employee_required', 'Please select an employee');
+      MessageService.to.showError(
+          'employees_required', 'Please select at least one employee');
       return;
     }
 
@@ -459,34 +465,88 @@ class AddWageController extends GetxController {
       isSaving.value = true;
       print("Setting isSaving to true");
 
-      Map<String, dynamic> wageData = _wageToRequestData();
-      print("Wage data prepared, calling API...");
+      // Prepare employee IDs
+      List<String> employeeIds = selectedEmployees.map((employee) {
+        return employee.id.toString(); // Ensure ID is string
+      }).toList();
 
-      Map<String, dynamic> result = await WageService.saveWage(
-        wageData: wageData,
+      print("Employee IDs prepared: $employeeIds");
+
+      // Parse amount
+      double amount = double.parse(amountController.text.trim());
+
+      // Prepare dates
+      String effectiveFrom = effectiveFromController.text.trim();
+      String? effectiveTo = effectiveToController.text.trim().isEmpty
+          ? null
+          : effectiveToController.text.trim();
+
+      // Prepare remarks
+      String? remarks = remarksController.text.trim().isEmpty
+          ? null
+          : remarksController.text.trim();
+
+      print("Calling WageService.saveMultipleEmployeeWages...");
+      print(
+          "Amount: $amount, EffectiveFrom: $effectiveFrom, EffectiveTo: $effectiveTo");
+
+      // Use the new saveMultipleEmployeeWages method from WageService
+      Map<String, dynamic> result = await WageService.saveMultipleEmployeeWages(
+        employeeIds: employeeIds,
+        amount: amount,
+        effectiveFrom: effectiveFrom,
+        effectiveTo: effectiveTo,
+        remarks: remarks,
       );
 
       print("API Response: $result");
 
-      if (result['success']) {
-        String message =
-            result['data']?['message'] ?? 'Wage record saved successfully';
+      if (WageService.isSuccessResponse(result)) {
+        // Handle successful response
+        var summary = WageService.getWageSummary(result);
+        var successfulWages = WageService.getSuccessfulWages(result);
+        var failedEmployees = WageService.getFailedEmployees(result);
 
-        print("✅ Wage saved successfully: $message");
+        String message = 'Wage records processed successfully';
+
+        if (summary != null) {
+          int successCount = summary['successful_count'] ?? 0;
+          int failedCount = summary['failed_count'] ?? 0;
+          message = 'Successfully saved wages for $successCount employee(s)';
+
+          if (failedCount > 0) {
+            message += ', $failedCount failed';
+          }
+        }
+
+        print("✅ Wages saved successfully: $message");
         MessageService.to.showSuccess('success_wage_saved', message);
+
+        // Show details of failed employees if any
+        if (failedEmployees != null && failedEmployees.isNotEmpty) {
+          String failedDetails = failedEmployees.map((failed) {
+            String employeeName = failed['employee_name'] ?? 'Unknown';
+            String reason = failed['reason'] ?? 'Unknown error';
+            return '$employeeName: $reason';
+          }).join('\n');
+
+          print("⚠️ Failed employees: $failedDetails");
+          MessageService.to.showError(
+              'partial_failure', 'Some employees failed:\n$failedDetails');
+        }
 
         _clearForm();
         await Future.delayed(Duration(milliseconds: 1000));
         Get.offAllNamed(Routes.WAGES, arguments: true);
       } else {
-        String errorMessage =
-            result['data']?['message'] ?? 'Failed to save wage record';
+        // Handle error response
+        String errorMessage = WageService.getErrorMessage(result);
 
-        // Handle validation errors from API
-        if (result['data'] != null && result['data']['errors'] != null) {
-          Map<String, dynamic> errors = result['data']['errors'];
-          String errorDetails = errors.entries
-              .map((entry) => '${entry.key}: ${entry.value.join(', ')}')
+        // Handle validation errors
+        var validationErrors = WageService.getValidationErrors(result);
+        if (validationErrors != null) {
+          String errorDetails = validationErrors.entries
+              .map((entry) => '${entry.key}: ${entry.value}')
               .join('\n');
           errorMessage = '$errorMessage\n$errorDetails';
         }
@@ -497,8 +557,20 @@ class AddWageController extends GetxController {
     } catch (e) {
       print('❌ Exception in saveWage: $e');
       print('Stack trace: ${StackTrace.current}');
-      MessageService.to.showNetworkError(
-          'Network error: Please check your connection and try again');
+
+      String errorMessage =
+          'Network error: Please check your connection and try again';
+
+      if (e.toString().contains('SocketException')) {
+        errorMessage =
+            'Network connection error. Please check your internet connection.';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'Request timeout. Please try again.';
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = 'Invalid data format. Please check your inputs.';
+      }
+
+      MessageService.to.showNetworkError(errorMessage);
     } finally {
       isSaving.value = false;
       print("Setting isSaving to false");
@@ -508,7 +580,7 @@ class AddWageController extends GetxController {
 
   /// Clear form data
   void _clearForm() {
-    selectedEmployee.value = null;
+    selectedEmployees.clear();
     amountController.clear();
     amountText.value = '';
 
@@ -551,11 +623,6 @@ class AddWageController extends GetxController {
   /// Get employee display name for dropdown
   String getEmployeeDisplayName(Employee employee) {
     return '${employee.name} (${employee.empType})';
-  }
-
-  /// Check if employee is already selected
-  bool isEmployeeSelected(Employee employee) {
-    return selectedEmployee.value?.id == employee.id;
   }
 
   /// Get formatted amount preview - now reactive
@@ -625,17 +692,17 @@ class AddWageController extends GetxController {
         text: text,
         selection: TextSelection.collapsed(offset: text.length),
       );
-      amountText.value = text; // Update reactive variable
+      amountText.value = text;
     }
   }
 
-  /// Validate form with visual feedback - can be called from UI
+  /// Validate form with visual feedback
   bool validateFormWithFeedback() {
     return _validateForm();
   }
 
   /// Quick validation methods for UI feedback
-  bool get isEmployeeValid => selectedEmployee.value != null;
+  bool get isEmployeeValid => selectedEmployees.isNotEmpty;
 
   bool get isAmountValid {
     if (amountController.text.trim().isEmpty) return false;

@@ -399,7 +399,7 @@ class ViewEmployees extends StatelessWidget {
         ElevatedButton.icon(
           onPressed:
               controller.hasPrevious.value ? controller.previousPage : null,
-          icon: Icon(Icons.chevron_left),
+          icon: Icon(Icons.chevron_left, color: kLightColor),
           label: Text('Previous'),
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryColor,
@@ -426,7 +426,7 @@ class ViewEmployees extends StatelessWidget {
         // Next button
         ElevatedButton.icon(
           onPressed: controller.hasNext.value ? controller.nextPage : null,
-          icon: Icon(Icons.chevron_right),
+          icon: Icon(Icons.chevron_right,color: kLightColor),
           label: Text('Next'),
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryColor,

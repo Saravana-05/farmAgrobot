@@ -8,19 +8,21 @@ class CustomElevatedButton extends StatelessWidget {
   final VoidCallback? onPressed; // Changed to nullable
   final RxBool? isLoading;
   final Color? backgroundColor;
+  final Color? textColor;
 
   const CustomElevatedButton({
     required this.text,
     this.onPressed,
     this.isLoading,
     this.backgroundColor,
+    this.textColor,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final isLoadingValue = isLoading?.value ?? false;
-    
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -36,7 +38,7 @@ class CustomElevatedButton extends StatelessWidget {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(kLightColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
                 ),
               )
             : Text(text),

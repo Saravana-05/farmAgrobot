@@ -1,4 +1,4 @@
-class Employee {
+class EmployeeAttendanceRecord {
   final String id;
   final String name;
   final String? tamilName;
@@ -6,7 +6,7 @@ class Employee {
   final bool hasWage;
   final bool status;
 
-  Employee({
+  EmployeeAttendanceRecord({
     required this.id,
     required this.name,
     this.tamilName,
@@ -15,8 +15,8 @@ class Employee {
     this.status = true,
   });
 
-  factory Employee.fromJson(Map<String, dynamic> json) {
-    return Employee(
+  factory EmployeeAttendanceRecord.fromJson(Map<String, dynamic> json) {
+    return EmployeeAttendanceRecord(
       id: json['employee_id'].toString(),
       name: json['employee_name'] ?? '',
       tamilName: json['tamil_name'],
@@ -690,4 +690,21 @@ class EmployeeStatistics {
       'average_daily_wage': averageDailyWage,
     };
   }
+}
+
+/// Bulk payment information model
+class BulkPaymentInfo {
+  final int id;
+  final DateTime paymentDate;
+  final String paymentMode;
+  final String paymentReference;
+  final double totalAmount;
+
+  BulkPaymentInfo({
+    required this.id,
+    required this.paymentDate,
+    required this.paymentMode,
+    required this.paymentReference,
+    required this.totalAmount,
+  });
 }

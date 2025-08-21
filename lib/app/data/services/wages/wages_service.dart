@@ -7,18 +7,129 @@ import '../../../config/api.dart';
 import '../../models/wages/wages_model.dart';
 
 class WageService {
-  /// Save wage data for an employee
-  static Future<Map<String, dynamic>> saveWage({
-    required Map<String, dynamic> wageData,
+  /// Save wage data for multiple employees (NEW METHOD)
+  static Future<Map<String, dynamic>> saveMultipleEmployeeWages({
+    required List<String> employeeIds,
+    required double amount,
+    required String effectiveFrom,
+    String? effectiveTo,
+    String? remarks,
   }) async {
     try {
+      final Map<String, dynamic> wageData = {
+        'employees': employeeIds,
+        'amount': amount,
+        'effective_from': effectiveFrom,
+      };
+
+      if (effectiveTo != null && effectiveTo.isNotEmpty) {
+        wageData['effective_to'] = effectiveTo;
+      }
+
+      if (remarks != null && remarks.isNotEmpty) {
+        wageData['remarks'] = remarks;
+      }
+
+      print('Sending multiple employee wage data: $wageData');
+
       final uri = Uri.parse(addWage);
 
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(wageData),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: json.encode(wageData),
+          )
+          .timeout(Duration(seconds: 30));
+
+      print('Multiple wage response status: ${response.statusCode}');
+      print('Multiple wage response body: ${response.body}');
+
+      // Parse response
+      Map<String, dynamic> responseData;
+      try {
+        responseData = json.decode(response.body);
+      } catch (e) {
+        print('Error decoding response JSON: $e');
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'data': {
+            'status': 'error',
+            'message': 'Invalid server response format'
+          },
+        };
+      }
+
+      // Check for success based on status code and response structure
+      bool isSuccess =
+          response.statusCode == 201 && responseData['status'] == 'success';
+
+      return {
+        'success': isSuccess,
+        'statusCode': response.statusCode,
+        'data': responseData,
+      };
+    } on SocketException catch (e) {
+      print('Network error: ${e.toString()}');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message':
+              'Network connection error. Please check your internet connection.'
+        },
+      };
+    } on TimeoutException catch (e) {
+      print('Timeout error: ${e.toString()}');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Request timeout. Please try again.'
+        },
+      };
+    } catch (e) {
+      print('General error: ${e.toString()}');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Network error: ${e.toString()}'
+        },
+      };
+    }
+  }
+
+  /// Save bulk wage data with individual wage records (Alternative method for complex cases)
+  static Future<Map<String, dynamic>> saveBulkWageData({
+    required List<Map<String, dynamic>> wagesData,
+  }) async {
+    try {
+      final Map<String, dynamic> requestData = {
+        'wages': wagesData,
+      };
+
+      print('Sending bulk wage data: $requestData'); // Debug log
+
+      // You'll need to add this URL to your API config
+      final uri = Uri.parse('$baseUrl/save_bulk_wage_data/');
+
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestData),
+          )
+          .timeout(Duration(seconds: 30));
+
+      print('Bulk wage response status: ${response.statusCode}'); // Debug log
+      print('Bulk wage response body: ${response.body}'); // Debug log
 
       return {
         'success': response.statusCode == 201,
@@ -31,7 +142,59 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
+        },
+      };
+    } on TimeoutException catch (e) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Request timeout. Please try again.'
+        },
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Network error: ${e.toString()}'
+        },
+      };
+    }
+  }
+
+  /// Save wage data for an employee (EXISTING METHOD - KEPT AS IS)
+  static Future<Map<String, dynamic>> saveWage({
+    required Map<String, dynamic> wageData,
+  }) async {
+    try {
+      final uri = Uri.parse(addWage);
+
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(wageData),
+          )
+          .timeout(Duration(seconds: 30));
+
+      return {
+        'success': response.statusCode == 201,
+        'statusCode': response.statusCode,
+        'data': json.decode(response.body),
+      };
+    } on SocketException catch (e) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -120,10 +283,7 @@ class WageService {
         return {
           'success': false,
           'statusCode': response.statusCode,
-          'data': {
-            'status': 'error',
-            'message': 'Empty response from server'
-          },
+          'data': {'status': 'error', 'message': 'Empty response from server'},
         };
       }
 
@@ -134,7 +294,7 @@ class WageService {
       } catch (jsonError) {
         print('JSON decode error: $jsonError');
         print('Response body that failed to decode: ${response.body}');
-        
+
         return {
           'success': false,
           'statusCode': response.statusCode,
@@ -159,7 +319,6 @@ class WageService {
           'data': responseData,
         };
       }
-
     } on SocketException catch (e) {
       print('Socket exception: $e');
       return {
@@ -167,7 +326,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -224,7 +384,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -249,7 +410,8 @@ class WageService {
   }
 
   /// Get all wages for a specific employee
-  static Future<Map<String, dynamic>> getEmployeeWages(String employeeId) async {
+  static Future<Map<String, dynamic>> getEmployeeWages(
+      String employeeId) async {
     try {
       final uri = Uri.parse('$baseUrl/get_employee_wages/$employeeId/');
 
@@ -269,7 +431,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -314,7 +477,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -346,11 +510,13 @@ class WageService {
     try {
       final uri = Uri.parse(updateEmployeeUrl.replaceAll('{id}', wageId));
 
-      final response = await http.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(wageData),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .put(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(wageData),
+          )
+          .timeout(Duration(seconds: 30));
 
       return {
         'success': response.statusCode == 200,
@@ -363,7 +529,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -388,14 +555,15 @@ class WageService {
   }
 
   /// Delete wage record
-  static Future<Map<String, dynamic>> deleteWage(String id, {
+  static Future<Map<String, dynamic>> deleteWage(
+    String id, {
     String? wageId, // Not needed but keeping for backward compatibility
     bool hardDelete = false, // Default to false as you mentioned
   }) async {
     try {
       // Replace the {id} placeholder with the actual wage ID
       String finalUrl = deleteWageUrl.replaceAll('{id}', id);
-      
+
       // Since you don't need hard_delete parameter, we won't add any query parameters
       // unless hardDelete is explicitly true
       final Map<String, String> queryParams = {};
@@ -423,28 +591,30 @@ class WageService {
 
       // Handle response body parsing
       Map<String, dynamic> responseData = {};
-      
+
       if (response.body.isNotEmpty) {
         try {
           responseData = json.decode(response.body);
         } catch (jsonError) {
           print('JSON decode error: $jsonError');
           print('Response body that failed to parse: "${response.body}"');
-          
+
           // If JSON parsing fails, create a response based on status code
           responseData = {
             'status': response.statusCode == 200 ? 'success' : 'error',
-            'message': response.statusCode == 200 
-                ? 'Wage deleted successfully' 
+            'message': response.statusCode == 200
+                ? 'Wage deleted successfully'
                 : 'Failed to delete wage - Invalid server response',
           };
         }
       } else {
         // Handle empty response body (common for DELETE operations)
         responseData = {
-          'status': response.statusCode == 200 || response.statusCode == 204 ? 'success' : 'error',
+          'status': response.statusCode == 200 || response.statusCode == 204
+              ? 'success'
+              : 'error',
           'message': response.statusCode == 200 || response.statusCode == 204
-              ? 'Wage deleted successfully' 
+              ? 'Wage deleted successfully'
               : 'Failed to delete wage',
         };
       }
@@ -457,7 +627,6 @@ class WageService {
         'statusCode': response.statusCode,
         'data': responseData,
       };
-      
     } on SocketException catch (e) {
       print('Socket exception: $e');
       return {
@@ -465,7 +634,8 @@ class WageService {
         'statusCode': 0,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -493,10 +663,7 @@ class WageService {
       return {
         'success': false,
         'statusCode': 500,
-        'data': {
-          'status': 'error',
-          'message': 'HTTP error: ${e.message}'
-        },
+        'data': {'status': 'error', 'message': 'HTTP error: ${e.message}'},
       };
     } catch (e) {
       print('Unexpected exception: $e');
@@ -524,11 +691,13 @@ class WageService {
         requestBody['end_date'] = endDate;
       }
 
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestBody),
+          )
+          .timeout(Duration(seconds: 30));
 
       return {
         'success': response.statusCode == 200,
@@ -541,7 +710,8 @@ class WageService {
         'statusCode': 500,
         'data': {
           'status': 'error',
-          'message': 'Network connection error. Please check your internet connection.'
+          'message':
+              'Network connection error. Please check your internet connection.'
         },
       };
     } on TimeoutException catch (e) {
@@ -605,6 +775,39 @@ class WageService {
     return data;
   }
 
+  /// Helper method to create wage data for multiple employees (NEW HELPER)
+  static Map<String, dynamic> createMultipleEmployeeWageData({
+    required List<String> employeeIds,
+    required DateTime effectiveFrom,
+    DateTime? effectiveTo,
+    required double amount,
+    String? remarks,
+  }) {
+    final Map<String, dynamic> data = {
+      'employees': employeeIds,
+      'effective_from': effectiveFrom.toIso8601String().split('T')[0],
+      'amount': amount,
+    };
+
+    if (effectiveTo != null) {
+      data['effective_to'] = effectiveTo.toIso8601String().split('T')[0];
+    }
+
+    if (remarks != null && remarks.isNotEmpty) {
+      data['remarks'] = remarks;
+    }
+
+    return data;
+  }
+
+  /// Helper method to create bulk wage data (NEW HELPER)
+  static Map<String, dynamic> createBulkWageData(
+      List<Map<String, dynamic>> wagesData) {
+    return {
+      'wages': wagesData,
+    };
+  }
+
   /// Helper method to format date for API calls
   static String formatDateForApi(DateTime date) {
     return date.toIso8601String().split('T')[0]; // YYYY-MM-DD format
@@ -626,11 +829,13 @@ class WageService {
     final errors = <String>[];
 
     // Check required fields
-    if (wageData['employee_id'] == null || wageData['employee_id'].toString().isEmpty) {
+    if (wageData['employee_id'] == null ||
+        wageData['employee_id'].toString().isEmpty) {
       errors.add('Employee ID is required');
     }
 
-    if (wageData['effective_from'] == null || wageData['effective_from'].toString().isEmpty) {
+    if (wageData['effective_from'] == null ||
+        wageData['effective_from'].toString().isEmpty) {
       errors.add('Effective from date is required');
     }
 
@@ -644,11 +849,58 @@ class WageService {
     }
 
     // Validate date format and logic
-    if (wageData['effective_from'] != null && wageData['effective_to'] != null) {
+    if (wageData['effective_from'] != null &&
+        wageData['effective_to'] != null) {
       try {
-        final effectiveFrom = DateTime.parse(wageData['effective_from'].toString());
+        final effectiveFrom =
+            DateTime.parse(wageData['effective_from'].toString());
         final effectiveTo = DateTime.parse(wageData['effective_to'].toString());
-        
+
+        if (effectiveTo.isBefore(effectiveFrom)) {
+          errors.add('Effective to date must be after effective from date');
+        }
+      } catch (e) {
+        errors.add('Invalid date format. Use YYYY-MM-DD');
+      }
+    }
+
+    return errors;
+  }
+
+  /// Helper method to validate multiple employee wage data (NEW VALIDATOR)
+  static List<String> validateMultipleEmployeeWageData(
+      Map<String, dynamic> wageData) {
+    final errors = <String>[];
+
+    // Check required fields for multiple employee wages
+    if (wageData['employees'] == null ||
+        wageData['employees'] is! List ||
+        (wageData['employees'] as List).isEmpty) {
+      errors.add('At least one employee must be selected');
+    }
+
+    if (wageData['effective_from'] == null ||
+        wageData['effective_from'].toString().isEmpty) {
+      errors.add('Effective from date is required');
+    }
+
+    if (wageData['amount'] == null) {
+      errors.add('Amount is required');
+    } else {
+      final amount = double.tryParse(wageData['amount'].toString());
+      if (amount == null || amount <= 0) {
+        errors.add('Amount must be greater than 0');
+      }
+    }
+
+    // Validate date format and logic
+    if (wageData['effective_from'] != null &&
+        wageData['effective_to'] != null) {
+      try {
+        final effectiveFrom =
+            DateTime.parse(wageData['effective_from'].toString());
+        final effectiveTo = DateTime.parse(wageData['effective_to'].toString());
+
         if (effectiveTo.isBefore(effectiveFrom)) {
           errors.add('Effective to date must be after effective from date');
         }
@@ -731,9 +983,9 @@ class WageService {
 
   /// Helper method to check if response indicates success
   static bool isSuccessResponse(Map<String, dynamic> response) {
-    return response['success'] == true && 
-           response['data'] != null && 
-           response['data']['status'] == 'success';
+    return response['success'] == true &&
+        response['data'] != null &&
+        response['data']['status'] == 'success';
   }
 
   /// Helper method to extract error message from response
@@ -745,9 +997,43 @@ class WageService {
   }
 
   /// Helper method to extract validation errors from response
-  static Map<String, dynamic>? getValidationErrors(Map<String, dynamic> response) {
+  static Map<String, dynamic>? getValidationErrors(
+      Map<String, dynamic> response) {
     if (response['data'] != null && response['data']['errors'] != null) {
       return response['data']['errors'];
+    }
+    return null;
+  }
+
+  /// Helper method to extract failed employees info from multiple wage response (NEW HELPER)
+  static List<Map<String, dynamic>>? getFailedEmployees(
+      Map<String, dynamic> response) {
+    if (response['data'] != null &&
+        response['data']['data'] != null &&
+        response['data']['data']['failed_employees'] != null) {
+      return List<Map<String, dynamic>>.from(
+          response['data']['data']['failed_employees']);
+    }
+    return null;
+  }
+
+  /// Helper method to extract summary from multiple wage response (NEW HELPER)
+  static Map<String, dynamic>? getWageSummary(Map<String, dynamic> response) {
+    if (response['data'] != null &&
+        response['data']['data'] != null &&
+        response['data']['data']['summary'] != null) {
+      return Map<String, dynamic>.from(response['data']['data']['summary']);
+    }
+    return null;
+  }
+
+  /// Helper method to extract successful wages from multiple wage response (NEW HELPER)
+  static List<Map<String, dynamic>>? getSuccessfulWages(
+      Map<String, dynamic> response) {
+    if (response['data'] != null &&
+        response['data']['data'] != null &&
+        response['data']['data']['wages'] != null) {
+      return List<Map<String, dynamic>>.from(response['data']['data']['wages']);
     }
     return null;
   }

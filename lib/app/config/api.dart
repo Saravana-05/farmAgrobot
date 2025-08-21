@@ -1,5 +1,5 @@
-const String baseUrl = 'http://192.168.0.111:8000/api/';
-const String baseImgUrl = 'http://192.168.0.111:8000';
+const String baseUrl = 'http://192.168.0.106:8000/api/';
+const String baseImgUrl = 'http://192.168.0.106:8000/';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';

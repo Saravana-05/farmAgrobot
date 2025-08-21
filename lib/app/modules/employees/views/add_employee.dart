@@ -67,6 +67,8 @@ class AddEmployee extends StatelessWidget {
                     onPressed: controller.isSaving.value
                         ? () {}
                         : () => controller.saveEmployee(),
+                    backgroundColor: kPrimaryColor,
+                    textColor: kLightColor,
                   ))
             ],
           ),
@@ -93,6 +95,10 @@ class AddEmployee extends StatelessWidget {
           ? TextInputType.number
           : (isMultiline ? TextInputType.multiline : TextInputType.text),
       maxLines: isMultiline ? null : 1,
+      // Add Tamil font support like your EditEmployee module
+      style: TextStyle(
+        fontFamily: label.contains('Tamil') ? 'NotoSansTamil' : null,
+      ),
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: iconColor),
         labelText: label,
@@ -100,7 +106,17 @@ class AddEmployee extends StatelessWidget {
           borderRadius: BorderRadius.circular(50.0),
           borderSide: const BorderSide(color: kSecondaryColor),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kSecondaryColor),
+        ),
         labelStyle: const TextStyle(color: kSecondaryColor),
+        filled: true,
+        fillColor: Colors.grey[50],
       ),
     );
   }

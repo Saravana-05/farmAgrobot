@@ -51,7 +51,7 @@ class MyDrawer extends GetView<drawer_controller.DrawerController> {
             MyDrawerItem(
               title: 'Attendance',
               icon: Icons.co_present,
-              onTap: () => controller.navigateToPage('/attendance_new'),
+              onTap: () => controller.navigateToPage('/attendance'),
             ),
             MyDrawerItem(
               title: 'Farm Segments',

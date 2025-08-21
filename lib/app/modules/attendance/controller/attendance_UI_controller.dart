@@ -6,7 +6,7 @@ import '../../../data/models/attendance/attendance_record_model.dart';
 
 class AttendanceUIController extends GetxController {
   // Core data observables
-  var employees = <Employee>[].obs;
+  var employees = <EmployeeAttendanceRecord>[].obs;
   var weeklyData = Rxn<WeeklyData>();
   var attendanceRecords = <String, Map<DateTime, int>>{}.obs;
   var selectedWeekStart = DateTime.now().obs;
@@ -20,9 +20,13 @@ class AttendanceUIController extends GetxController {
   // Wage management
   var grandTotalWages = 0.0.obs;
   var wagesPaid = false.obs;
+  var paymentType = 'none'.obs;
   var employeePaymentStatus = <String, String>{}.obs;
   var employeePartialPayments = <String, double>{}.obs;
   var employeeRemainingAmounts = <String, double>{}.obs;
+
+  // Bulk payment info
+  var bulkPaymentInfo = Rxn<BulkPaymentInfo>();
 
   // Statistics and counts
   var dailyEmployeeCount = <DateTime, int>{}.obs;
@@ -67,7 +71,7 @@ class AttendanceUIController extends GetxController {
     isLoading.value = true;
 
     try {
-      print('🚀 Starting fetchWeeklyData for week: ${selectedWeekStart.value}');
+      print('Starting fetchWeeklyData for week: ${selectedWeekStart.value}');
 
       final response = await AttendanceService.getWeeklyData(
         weekStart: selectedWeekStart.value,
@@ -79,9 +83,9 @@ class AttendanceUIController extends GetxController {
       print('Data exists: ${response['data'] != null}');
 
       if (response['success'] == true && response['data'] != null) {
-        print('✅ API call successful, processing data...');
+        print('API call successful, processing data...');
 
-        // 🔍 CRITICAL: Debug the data before parsing
+        // CRITICAL: Debug the data before parsing
         final rawData = response['data'];
         print('Raw data type: ${rawData.runtimeType}');
         print('Raw data keys: ${rawData.keys}');
@@ -92,10 +96,10 @@ class AttendanceUIController extends GetxController {
         }
 
         // Parse using the model
-        print('🔄 Parsing with WeeklyData.fromJson...');
+        print('Parsing with WeeklyData.fromJson...');
         final weeklyDataModel = WeeklyData.fromJson(rawData);
 
-        // 🔍 CRITICAL: Debug the parsed model
+        // CRITICAL: Debug the parsed model
         print('=== PARSED MODEL DEBUG ===');
         print('Parsed employees count: ${weeklyDataModel.employees.length}');
         for (int i = 0; i < weeklyDataModel.employees.length; i++) {
@@ -106,16 +110,16 @@ class AttendanceUIController extends GetxController {
 
         weeklyData.value = weeklyDataModel;
 
-        print('🔄 Processing weekly data...');
+        print('Processing weekly data...');
         await _processWeeklyData(weeklyDataModel);
 
         _showSuccessMessage('Weekly data loaded successfully');
       } else {
-        print('❌ API Error Response: $response');
+        print('API Error Response: $response');
         _handleApiError(response);
       }
     } catch (e, stackTrace) {
-      print('💥 Exception in fetchWeeklyData: $e');
+      print('Exception in fetchWeeklyData: $e');
       print('Stack trace: $stackTrace');
       _handleException('Failed to fetch weekly data', e);
     } finally {
@@ -130,7 +134,10 @@ class AttendanceUIController extends GetxController {
 
     _clearLocalData();
 
-    // Process employees and attendance data
+    // FIXED: Create employee map from API response data
+    Map<String, EmployeeAttendanceRecord> employeeMap = {};
+
+    // Process employees from the weekly data response
     for (int i = 0; i < data.employees.length; i++) {
       var empData = data.employees[i];
       print('Processing employee $i:');
@@ -139,22 +146,19 @@ class AttendanceUIController extends GetxController {
       print('  - Daily Wage: ${empData.dailyWage}');
       print('  - Attendance entries: ${empData.attendance.length}');
 
-      final employee = Employee(
+      // Create employee record
+      employeeMap[empData.employeeId] = EmployeeAttendanceRecord(
         id: empData.employeeId,
         name: empData.employeeName,
         dailyWage: empData.dailyWage,
         hasWage: true,
       );
 
-      employees.add(employee);
-      print('  ✅ Added employee to list. Current count: ${employees.length}');
-
-      // Store attendance records - FIXED: Handle null status values
+      // Store attendance records - Handle null status values
       attendanceRecords[empData.employeeId] = {};
       empData.attendance.forEach((dateString, status) {
         final date = DateTime.tryParse(dateString);
         if (date != null && status != null) {
-          // ✅ Check both date and status for null
           attendanceRecords[empData.employeeId]![date] = status;
         }
       });
@@ -165,6 +169,64 @@ class AttendanceUIController extends GetxController {
       employeeRemainingAmounts[empData.employeeId] = empData.remainingAmount;
     }
 
+    // FIXED: If no employees in weekly data, fetch active employees as fallback
+    if (employeeMap.isEmpty) {
+      print('No employees in weekly data, fetching active employees...');
+      try {
+        final response = await AttendanceService.getActiveEmployees();
+        if (response['success'] == true && response['data'] != null) {
+          final apiData = response['data'];
+
+          if (apiData.containsKey('employees') &&
+              apiData['employees'] is List) {
+            final employeeList = apiData['employees'] as List;
+
+            for (var empJson in employeeList) {
+              final employeeId = empJson['employee_id'].toString();
+              final employee = EmployeeAttendanceRecord(
+                id: employeeId,
+                name: empJson['employee_name'].toString(),
+                dailyWage:
+                    double.tryParse(empJson['daily_wage'].toString()) ?? 0.0,
+                hasWage: empJson['has_wage'] ?? false,
+              );
+
+              employeeMap[employee.id] = employee;
+
+              // Initialize empty attendance and payment data
+              if (!attendanceRecords.containsKey(employeeId)) {
+                attendanceRecords[employeeId] = {};
+              }
+              if (!employeePaymentStatus.containsKey(employeeId)) {
+                employeePaymentStatus[employeeId] = 'pending';
+                employeePartialPayments[employeeId] = 0.0;
+                employeeRemainingAmounts[employeeId] = 0.0;
+              }
+            }
+
+            print('Loaded ${employeeMap.length} active employees as fallback');
+          }
+        }
+      } catch (e) {
+        print('Error loading active employees: $e');
+      }
+    }
+
+    // Convert map back to list
+    employees.value = employeeMap.values.toList();
+
+    // Ensure all employees have initialized payment data
+    for (var employee in employees) {
+      if (!employeePaymentStatus.containsKey(employee.id)) {
+        employeePaymentStatus[employee.id] = 'pending';
+        employeePartialPayments[employee.id] = 0.0;
+        employeeRemainingAmounts[employee.id] = 0.0;
+      }
+      if (!attendanceRecords.containsKey(employee.id)) {
+        attendanceRecords[employee.id] = {};
+      }
+    }
+
     print('=== AFTER PROCESSING ===');
     print('Final employees count: ${employees.length}');
     for (int i = 0; i < employees.length; i++) {
@@ -173,7 +235,7 @@ class AttendanceUIController extends GetxController {
     }
 
     // Apply employee ordering
-    print('🔄 Applying employee ordering...');
+    print('Applying employee ordering...');
     _applyEmployeeOrdering();
 
     print('=== AFTER ORDERING ===');
@@ -199,11 +261,14 @@ class AttendanceUIController extends GetxController {
       final response = await AttendanceService.getActiveEmployees();
 
       if (response['success'] == true && response['data'] != null) {
+        // FIXED: Use the corrected parsing method
         final employeeList =
             AttendanceService.employeeListFromJson(response['data']);
         employees.value = employeeList;
         _applyEmployeeOrdering();
         _showSuccessMessage('Active employees loaded successfully');
+
+        print('Fetched ${employeeList.length} active employees');
       } else {
         _handleApiError(response);
       }
@@ -365,6 +430,13 @@ class AttendanceUIController extends GetxController {
   }) async {
     if (isProcessingPayment.value) return;
 
+    print('PAYMENT DEBUG - Starting payment process');
+    print('Employee ID: $employeeId');
+    print('Amount: $amount');
+    print('Current payment status: ${employeePaymentStatus[employeeId]}');
+    print('Current partial payment: ${employeePartialPayments[employeeId]}');
+    print('Current remaining: ${employeeRemainingAmounts[employeeId]}');
+
     isProcessingPayment.value = true;
 
     try {
@@ -378,22 +450,117 @@ class AttendanceUIController extends GetxController {
         payAll: false,
       );
 
+      print('Sending API request...');
       final response = await AttendanceService.payWages(request: request);
 
+      print('API Response received:');
+      print('Success: ${response['success']}');
+      print('Response data: ${response['data']}');
+
       if (response['success'] == true) {
+        print('API call successful, refreshing data...');
+
+        // Store old values for comparison
+        final oldStatus = employeePaymentStatus[employeeId] ?? 'pending';
+        final oldPartial = employeePartialPayments[employeeId] ?? 0.0;
+        final oldRemaining = employeeRemainingAmounts[employeeId] ?? 0.0;
+
+        print('Before fetchWeeklyData:');
+        print('  Status: $oldStatus');
+        print('  Partial: $oldPartial');
+        print('  Remaining: $oldRemaining');
+
+        // Refresh data from backend
         await fetchWeeklyData();
+
+        print('After fetchWeeklyData:');
+        print('  Status: ${employeePaymentStatus[employeeId]}');
+        print('  Partial: ${employeePartialPayments[employeeId]}');
+        print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
+
+        // Check if values actually changed
+        final newStatus = employeePaymentStatus[employeeId] ?? 'pending';
+        final newPartial = employeePartialPayments[employeeId] ?? 0.0;
+        final newRemaining = employeeRemainingAmounts[employeeId] ?? 0.0;
+
+        if (newStatus == oldStatus &&
+            newPartial == oldPartial &&
+            newRemaining == oldRemaining) {
+          print(
+              'WARNING: Payment values did not change after fetchWeeklyData!');
+          print(
+              'This indicates the backend is not returning updated payment data.');
+
+          // Manual update as fallback
+          print('Manually updating local state...');
+          final totalWages = getTotalWages(employeeId);
+          final newTotalPaid = oldPartial + amount;
+
+          employeePartialPayments[employeeId] = newTotalPaid;
+
+          if (newTotalPaid >= totalWages) {
+            employeePaymentStatus[employeeId] = 'paid';
+            employeeRemainingAmounts[employeeId] = 0.0;
+          } else {
+            employeePaymentStatus[employeeId] = 'partial';
+            employeeRemainingAmounts[employeeId] = totalWages - newTotalPaid;
+          }
+
+          // Force UI refresh
+          employeePaymentStatus.refresh();
+          employeePartialPayments.refresh();
+          employeeRemainingAmounts.refresh();
+
+          print('Manual update complete:');
+          print('  Status: ${employeePaymentStatus[employeeId]}');
+          print('  Partial: ${employeePartialPayments[employeeId]}');
+          print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
+        } else {
+          print('Payment values updated correctly from backend');
+        }
 
         final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
         final employeeName = employee?.name ?? 'Employee';
 
         _showPaymentSuccessDialog(employeeName, amount);
       } else {
+        print('API call failed: ${response}');
         _handleApiError(response);
       }
     } catch (e) {
+      print('Payment error: $e');
       _handleException('Failed to process payment', e);
     } finally {
       isProcessingPayment.value = false;
+    }
+  }
+
+  /// Force refresh of weekly data - useful when you know employees were added
+  Future<void> forceRefreshWeeklyData() async {
+    print('Force refreshing weekly data...');
+
+    // Clear cached data
+    weeklyData.value = null;
+    _clearLocalData();
+
+    // Fetch fresh data
+    await fetchWeeklyData();
+  }
+
+  /// Method to manually sync employees (can be called from UI)
+  Future<void> syncEmployeesForCurrentWeek() async {
+    if (isLoading.value) return;
+
+    isLoading.value = true;
+
+    try {
+      // This will trigger the backend to sync the weekly record with active employees
+      await fetchWeeklyData();
+      _showSuccessMessage('Employees synchronized successfully');
+    } catch (e) {
+      _handleException('Failed to sync employees', e);
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -621,7 +788,7 @@ class AttendanceUIController extends GetxController {
 
   /// Apply custom employee order
   void _applyCustomOrder() {
-    final reorderedEmployees = <Employee>[];
+    final reorderedEmployees = <EmployeeAttendanceRecord>[];
 
     for (String employeeId in customEmployeeOrder) {
       try {
@@ -633,7 +800,7 @@ class AttendanceUIController extends GetxController {
     }
 
     // Add any employees not in custom order
-    for (Employee employee in employees) {
+    for (EmployeeAttendanceRecord employee in employees) {
       if (!customEmployeeOrder.contains(employee.id)) {
         reorderedEmployees.add(employee);
       }
@@ -936,5 +1103,72 @@ class AttendanceUIController extends GetxController {
   void onClose() {
     // Clean up any resources if needed
     super.onClose();
+  }
+
+  /// Get total paid amount across all employees
+  double getTotalPaidAmount() {
+    double totalPaid = 0.0;
+    for (var employee in employees) {
+      totalPaid += getPartialPayment(employee.id);
+    }
+    return totalPaid;
+  }
+
+  /// Get total remaining amount across all employees
+  double getTotalRemainingAmount() {
+    return grandTotalWages.value - getTotalPaidAmount();
+  }
+
+  /// Check if there are any unpaid employees
+  bool get hasUnpaidEmployees {
+    return employees.any((employee) => getRemainingAmount(employee.id) > 0);
+  }
+
+  /// Get count of employees by payment status
+  Map<String, int> getPaymentStatusCounts() {
+    int paid = 0;
+    int partial = 0;
+    int pending = 0;
+
+    for (var employee in employees) {
+      final status = getPaymentStatus(employee.id);
+      final partialAmount = getPartialPayment(employee.id);
+
+      if (status == 'paid') {
+        paid++;
+      } else if (partialAmount > 0) {
+        partial++;
+      } else {
+        pending++;
+      }
+    }
+
+    return {
+      'paid': paid,
+      'partial': partial,
+      'pending': pending,
+    };
+  }
+
+  /// Update individual employee remaining amount after payment
+  void updateEmployeeRemainingAmount(String employeeId, double paidAmount) {
+    final currentRemaining = getRemainingAmount(employeeId);
+    final newRemaining = currentRemaining - paidAmount;
+
+    if (newRemaining <= 0) {
+      employeePaymentStatus[employeeId] = 'paid';
+      employeeRemainingAmounts[employeeId] = 0.0;
+      employeePartialPayments[employeeId] = getTotalWages(employeeId);
+    } else {
+      employeePaymentStatus[employeeId] = 'partial';
+      employeeRemainingAmounts[employeeId] = newRemaining;
+      employeePartialPayments[employeeId] =
+          (employeePartialPayments[employeeId] ?? 0.0) + paidAmount;
+    }
+
+    // Force UI refresh
+    employeePaymentStatus.refresh();
+    employeeRemainingAmounts.refresh();
+    employeePartialPayments.refresh();
   }
 }

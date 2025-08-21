@@ -79,6 +79,8 @@ class EditEmployee extends StatelessWidget {
                       onPressed: controller.isSaving.value
                           ? () {}
                           : () => controller.updateEmployee(),
+                      backgroundColor: kPrimaryColor,
+                      textColor: kLightColor,
                     )),
                 const SizedBox(height: 20.0),
                 // Cancel button
@@ -352,23 +354,7 @@ class EditEmployee extends StatelessWidget {
                             ),
                           ),
                         ),
-                      // Edit overlay
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: kPrimaryColor,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
+                      
                     ],
                   ),
                 ),
@@ -380,7 +366,7 @@ class EditEmployee extends StatelessWidget {
                       // Upload button
                       Obx(() => TextField(
                             decoration: InputDecoration(
-                              labelText: 'Employee Photo',
+                              labelText: 'Update Emp Photo',
                               hintText: controller.isUploading.value
                                   ? 'Processing...'
                                   : 'Tap to change image',

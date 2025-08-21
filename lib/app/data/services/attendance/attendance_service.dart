@@ -10,138 +10,133 @@ class AttendanceService {
   static const int timeoutDuration = 30;
 
   /// Get weekly attendance data
- static Future<Map<String, dynamic>> getWeeklyData({
-  required DateTime weekStart,
-}) async {
-  try {
-    final formattedDate = DateFormat('yyyy-MM-dd').format(weekStart);
-    final uri = Uri.parse(getAttendanceListUrl)
-        .replace(queryParameters: {'week_start': formattedDate});
+  static Future<Map<String, dynamic>> getWeeklyData({
+    required DateTime weekStart,
+  }) async {
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(weekStart);
+      final uri = Uri.parse(getAttendanceListUrl)
+          .replace(queryParameters: {'week_start': formattedDate});
 
-    print('🔍 Calling API: $uri');
+      print('🔍 Calling API: $uri');
 
-    final response = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ).timeout(Duration(seconds: timeoutDuration));
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(Duration(seconds: timeoutDuration));
 
-    print('📡 Response status: ${response.statusCode}');
+      print('📡 Response status: ${response.statusCode}');
 
-    if (response.statusCode == 200) {
-      try {
-        final responseData = json.decode(response.body);
-        
-        // 🔍 CRITICAL DEBUG: Print the exact raw response
-        print('=== RAW API RESPONSE DEBUG ===');
-        print('Full response keys: ${responseData.keys}');
-        print('Response type: ${responseData.runtimeType}');
-        
-        // Check employees specifically
-        if (responseData.containsKey('employees')) {
-          print('✅ Employees key exists');
-          print('Employees type: ${responseData['employees'].runtimeType}');
-          print('Employees length: ${responseData['employees']?.length ?? 0}');
-          print('Raw employees data: ${responseData['employees']}');
-          
-          // Print each employee individually
-          if (responseData['employees'] is List) {
-            List employees = responseData['employees'];
-            for (int i = 0; i < employees.length; i++) {
-              print('Employee $i: ${employees[i]}');
-              print('Employee $i ID: ${employees[i]['employee_id']}');
-              print('Employee $i Name: ${employees[i]['employee_name']}');
+      if (response.statusCode == 200) {
+        try {
+          final responseData = json.decode(response.body);
+
+          // 🔍 DEBUG: Print the response structure
+          print('=== API RESPONSE DEBUG ===');
+          print('Response keys: ${responseData.keys}');
+          print('Response type: ${responseData.runtimeType}');
+
+          // Validate required fields from backend
+          if (responseData.containsKey('employees') &&
+              responseData.containsKey('week_start_date') &&
+              responseData.containsKey('week_end_date')) {
+           
+
+            // Print employee details for debugging
+            if (responseData['employees'] is List) {
+              List employees = responseData['employees'];
+              for (int i = 0; i < employees.length && i < 3; i++) {
+                print(
+                    'Employee $i: ID=${employees[i]['employee_id']}, Name=${employees[i]['employee_name']}, Status=${employees[i]['payment_status']}');
+              }
             }
+
+            // Return the data directly since backend doesn't wrap it
+            return {
+              'success': true,
+              'statusCode': response.statusCode,
+              'data': responseData, // Direct response data from backend
+            };
+          } else {
+            print('❌ Invalid response structure - missing required fields');
+            return {
+              'success': false,
+              'statusCode': response.statusCode,
+              'data': {
+                'status': 'error',
+                'message': 'Invalid response structure from server'
+              },
+            };
           }
-        } else {
-          print('❌ No employees key in response');
-        }
-        
-        // Check if backend returns the new format with 'success' and 'data'
-        if (responseData is Map<String, dynamic> &&
-            responseData.containsKey('success') &&
-            responseData.containsKey('data')) {
-          print('📦 New backend format detected');
-          print('Data employees: ${responseData['data']['employees']?.length ?? 0}');
+        } catch (jsonError) {
+          print('❌ JSON parsing error: $jsonError');
+          print('Raw response body: ${response.body}');
           return {
-            'success': responseData['success'],
+            'success': false,
             'statusCode': response.statusCode,
-            'data': responseData['data'],
-          };
-        } else {
-          print('📦 Old backend format detected');
-          return {
-            'success': true,
-            'statusCode': response.statusCode,
-            'data': responseData,
+            'data': {
+              'status': 'error',
+              'message':
+                  'Invalid JSON response from server: ${jsonError.toString()}'
+            },
           };
         }
-      } catch (jsonError) {
-        print('❌ JSON parsing error: $jsonError');
-        print('Raw response body: ${response.body}');
-        return {
-          'success': false,
-          'statusCode': response.statusCode,
-          'data': {
-            'status': 'error',
-            'message': 'Invalid JSON response from server: ${jsonError.toString()}'
-          },
-        };
+      } else {
+        // Handle HTTP error responses
+        try {
+          final errorData = json.decode(response.body);
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'data': errorData,
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'statusCode': response.statusCode,
+            'data': {
+              'status': 'error',
+              'message': 'HTTP ${response.statusCode}: ${response.reasonPhrase}'
+            },
+          };
+        }
       }
-    } else {
-      // Handle HTTP error responses
-      try {
-        final errorData = json.decode(response.body);
-        return {
-          'success': false,
-          'statusCode': response.statusCode,
-          'data': errorData,
-        };
-      } catch (e) {
-        return {
-          'success': false,
-          'statusCode': response.statusCode,
-          'data': {
-            'status': 'error',
-            'message': 'HTTP ${response.statusCode}: ${response.reasonPhrase}'
-          },
-        };
-      }
+    } on SocketException catch (e) {
+      print('🌐 Network error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message':
+              'Network connection error. Please check your internet connection.'
+        },
+      };
+    } on TimeoutException catch (e) {
+      print('⏱️ Timeout error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'Request timeout. Please try again.'
+        },
+      };
+    } catch (e) {
+      print('💥 Unexpected error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': {
+          'status': 'error',
+          'message': 'An unexpected error occurred: ${e.toString()}'
+        },
+      };
     }
-  } on SocketException catch (e) {
-    print('🌐 Network error: $e');
-    return {
-      'success': false,
-      'statusCode': 500,
-      'data': {
-        'status': 'error',
-        'message': 'Network connection error. Please check your internet connection.'
-      },
-    };
-  } on TimeoutException catch (e) {
-    print('⏱️ Timeout error: $e');
-    return {
-      'success': false,
-      'statusCode': 500,
-      'data': {
-        'status': 'error',
-        'message': 'Request timeout. Please try again.'
-      },
-    };
-  } catch (e) {
-    print('💥 Unexpected error: $e');
-    return {
-      'success': false,
-      'statusCode': 500,
-      'data': {
-        'status': 'error',
-        'message': 'An unexpected error occurred: ${e.toString()}'
-      },
-    };
   }
-}
 
   /// Mark attendance for multiple employees
   static Future<Map<String, dynamic>> markAttendance({
@@ -375,10 +370,6 @@ class AttendanceService {
           )
           .timeout(Duration(seconds: timeoutDuration));
 
-      print('Calling API: $baseUrl/api/update-single-attendance/');
-      print('Request body: ${json.encode(requestBody)}');
-      print('Update attendance response status: ${response.statusCode}');
-      print('Update attendance response body: ${response.body}');
 
       return {
         'success': response.statusCode == 200,
@@ -770,8 +761,8 @@ class AttendanceService {
   }
 
   /// Convert API response to Employee list
-  static List<Employee> employeeListFromJson(List<dynamic> jsonList) {
-    return jsonList.map((json) => Employee.fromJson(json)).toList();
+  static List<EmployeeAttendanceRecord> employeeListFromJson(List<dynamic> jsonList) {
+    return jsonList.map((json) => EmployeeAttendanceRecord.fromJson(json)).toList();
   }
 
   /// Convert EmployeeAttendance to JSON for API requests
