@@ -74,6 +74,11 @@ class MyDrawer extends GetView<drawer_controller.DrawerController> {
               onTap: () => controller.navigateToPage('/expenses'),
             ),
             MyDrawerItem(
+              title: 'Wages',
+              icon: Icons.money,
+              onTap: () => controller.navigateToPage('/wages'),
+            ),
+            MyDrawerItem(
               title: 'Sales',
               icon: Icons.sell,
               onTap: () => controller.navigateToPage('/sales'),

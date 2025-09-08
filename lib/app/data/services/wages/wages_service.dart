@@ -508,7 +508,7 @@ class WageService {
     required Map<String, dynamic> wageData,
   }) async {
     try {
-      final uri = Uri.parse(updateEmployeeUrl.replaceAll('{id}', wageId));
+      final uri = Uri.parse(updateWageUrl.replaceAll('{id}', wageId));
 
       final response = await http
           .put(

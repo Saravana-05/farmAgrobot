@@ -1,5 +1,8 @@
-const String baseUrl = 'http://192.168.0.106:8000/api/';
-const String baseImgUrl = 'http://192.168.0.106:8000/';
+const String baseUrl = 'http://192.168.0.117:8000/api/';
+const String baseImgUrl = 'http://192.168.0.117:8000/';
+
+// const String baseUrl = 'https://farmagrobot.ofal.in/api/';
+// const String baseImgUrl = 'https://farmagrobot.ofal.in/';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';
@@ -128,15 +131,42 @@ const String editWageUrl = baseUrl + 'wages/{id}/';
 // Daily Attendance
 const String createDailyAttendanceUrl = baseUrl + 'mark-attendance/';
 const String getAttendanceListUrl = baseUrl + 'weekly-data/';
-
+const String getActiveEmployeesUrl = baseUrl + 'get-active-employees/';
 // Additional Attendance URLs
 const String getAttendanceUrl = baseUrl + 'attendance/{date_str}/';
 const String updateAttendanceUrl = baseUrl + 'attendance/{date_str}/update/';
 const String updateSingleAttendanceUrl = baseUrl + 'update-single-attendance/';
-
 // ============= WAGE MANAGEMENT =============
 const String payWagesUrl = baseUrl + 'pay-wages/';
 const String wageSummaryUrl = baseUrl + 'wage-summary/';
-
 // ============= EXPORT =============
 const String exportAttendanceUrl = baseUrl + 'export-attendance/';
+// ============= GENERATE PDF =============
+const String pdfExport = baseUrl + 'wages/pdf/weekly/';
+// ============= Employee Report =============
+const String empReport = baseUrl + 'employee-report/';
+const String singleEmployeeReportUrl = baseUrl + 'employee/{id}/report/';
+
+// ============= ATTENDANCE END =============
+
+// Crop URLs
+const String addCrop = baseUrl + 'crops/';
+const String viewCrop = baseUrl + 'crops/all/';
+const String deleteCropUrl = baseUrl + 'crops/{id}/delete/';
+const String updateCropUrl = baseUrl + 'crops/{id}/update/';
+const String editCropUrl = baseUrl + 'crops/{id}/';
+
+// Crop Variant URLs
+const String addCropVariant = baseUrl + 'crop-variants/create/';
+const String viewCropVariants = baseUrl + 'crop-variants/';
+const String deleteCropVariantUrl = baseUrl + 'crop-variants/{id}/delete/';
+const String updateCropVariantUrl = baseUrl + 'crop-variants/{id}/update/';
+const String editCropVariantUrl = baseUrl + 'crop-variants/{id}/';
+const String cropVariantsByCropUrl = baseUrl + 'crops/{crop_id}/variants/';
+
+// Merchant URLs
+const String addMerchant = baseUrl + 'merchants/';
+const String viewMerchant = baseUrl + 'merchants/all/';
+const String deleteMerchantUrl = baseUrl + 'merchants/{id}/delete/';
+const String updateMerchantUrl = baseUrl + 'merchants/{id}/update/';
+const String editMerchantUrl = baseUrl + 'merchants/{id}/';

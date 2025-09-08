@@ -1,8 +1,15 @@
-import 'package:farm_agrobot/app/modules/attendance/controller/attendance_controller.dart';
 import 'package:get/get.dart';
-import '../modules/attendance/binding/employee_detail_binding.dart';
+import '../modules/attendance/binding/employee_details_screen_binding.dart';
 import '../modules/attendance/views/attendance.dart';
-import '../modules/attendance/views/employee_details_page.dart';
+import '../modules/attendance/views/employee_details_screen.dart';
+import '../modules/crop_variants/views/add_crop_variant.dart';
+import '../modules/crop_variants/views/crop_variant_screen.dart';
+import '../modules/crop_variants/views/edit_crop_variant.dart';
+import '../modules/crop_variants/views/view_crop_variant.dart';
+import '../modules/crops/views/add_crop_screen.dart';
+import '../modules/crops/views/crop_edit_screen.dart';
+import '../modules/crops/views/crop_view.dart';
+import '../modules/crops/views/crops_screen.dart';
 import '../modules/employees/views/add_employee.dart';
 import '../modules/employees/views/edit_employee_screen.dart';
 import '../modules/employees/views/employee_screen.dart';
@@ -15,6 +22,11 @@ import '../modules/expenses/views/expense_screen.dart';
 import '../modules/expenses/views/expense_view.dart';
 import '../modules/home/binding/home_binding.dart';
 import '../modules/home/views/home_view.dart';
+import '../modules/merchants/views/add_merchant.dart';
+import '../modules/merchants/views/edit_merchant.dart';
+import '../modules/merchants/views/merchant_screen.dart';
+import '../modules/merchants/views/view_merchant.dart';
+import '../modules/settings/views/settings_screen.dart';
 import '../modules/splash/views/splash_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
 import '../modules/wages/views/add_wages.dart';
@@ -105,9 +117,77 @@ class AppPages {
       // binding: EditExpenseBinding(),
     ),
     GetPage(
-      name: _Paths.EMPLOYEE_DETAILS,
-      page: () => EmployeeDetailsPage(),
-      binding: EmployeeDetailsBinding(),
+      name: _Paths.CROPS,
+      page: () => CropScreen(),
+      // binding: EditExpenseBinding(),
     ),
+    GetPage(
+      name: _Paths.ADD_CROPS,
+      page: () => AddCrops(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_CROPS,
+      page: () => CropEditScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.VIEW_CROPS,
+      page: () => ViewCrops(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.CROPS_VARIANTS,
+      page: () => CropVariantScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_CROPS_VARIANTS,
+      page: () => AddCropVariant(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.VIEW_CROPS_VARIANTS,
+      page: () => ViewCropVariants(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_CROPS_VARIANTS,
+      page: () => CropVariantEditScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+     GetPage(
+      name: _Paths.MERCHANT,
+      page: () => MerchantScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_MERCHANT,
+      page: () => AddMerchant(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.VIEW_MERCHANT,
+      page: () => ViewMerchants(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_MERCHANT,
+      page: () => MerchantEditScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.SETTINGS,
+      page: () => SettingsScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EMPLOYEE_DETAILS,
+      page: () => EmployeeDetailsScreen(),
+      binding: EmployeeDetailsBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    
   ];
 }

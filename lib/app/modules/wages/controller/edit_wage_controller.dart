@@ -13,9 +13,7 @@ class EditWageController extends GetxController {
   // Observable variables
   var isSaving = false.obs;
   var isLoading = false.obs;
-  var isLoadingEmployees = false.obs;
   var selectedIndex = 0.obs;
-  var selectedEmployee = Rxn<Employee>();
   var currentWage = Rxn<Wage>();
 
   // Add reactive variables for form updates
@@ -28,9 +26,7 @@ class EditWageController extends GetxController {
   final TextEditingController effectiveFromController = TextEditingController();
   final TextEditingController effectiveToController = TextEditingController();
   final TextEditingController remarksController = TextEditingController();
-
-  // Employee list for dropdown
-  final RxList<Employee> employees = <Employee>[].obs;
+  final TextEditingController employeeNameController = TextEditingController(); // Read-only field
 
   // Wage ID parameter
   String? wageId;
@@ -70,10 +66,11 @@ class EditWageController extends GetxController {
     effectiveFromController.dispose();
     effectiveToController.dispose();
     remarksController.dispose();
+    employeeNameController.dispose();
     super.onClose();
   }
 
-  /// Initialize controller data - FIXED VERSION
+  /// Initialize controller data - SIMPLIFIED VERSION
   Future<void> _initializeData() async {
     if (wageId == null || wageId!.isEmpty) {
       MessageService.to
@@ -84,21 +81,16 @@ class EditWageController extends GetxController {
 
     try {
       isLoading.value = true;
-      print("🔄 Starting initialization for wage ID: $wageId");
+      print("Starting initialization for wage ID: $wageId");
 
-      // Load employees FIRST, then wage details
-      print("🔄 Loading employees first...");
-      await _loadEmployees();
-
-      print("🔄 Employees loaded: ${employees.length}");
-
-      print("🔄 Loading wage details after employees are loaded...");
+      // Only load wage details (no employee list needed)
+      print("Loading wage details...");
       await _loadWageDetail();
 
       // Debug the final state
       debugDataLoading();
     } catch (e) {
-      print('❌ Error in _initializeData: $e');
+      print('Error in _initializeData: $e');
       MessageService.to.showError(
           'initialization_error', 'Failed to initialize data: ${e.toString()}');
     } finally {
@@ -106,16 +98,16 @@ class EditWageController extends GetxController {
     }
   }
 
-  /// Load wage detail and populate form - FIXED VERSION
+  /// Load wage detail and populate form - SIMPLIFIED VERSION
   Future<void> _loadWageDetail() async {
     try {
-      print("🔍 Loading wage detail for ID: $wageId");
+      print("Loading wage detail for ID: $wageId");
 
       Map<String, dynamic> result = await WageService.getWageDetail(wageId!);
-      print("📥 Wage detail API result: $result");
+      print("Wage detail API result: $result");
 
       if (result['success'] == true) {
-        // Handle the API response structure more carefully
+        // Handle the API response structure
         Map<String, dynamic> wageData;
 
         // Check different possible response structures
@@ -132,19 +124,18 @@ class EditWageController extends GetxController {
           throw Exception('No data found in API response');
         }
 
-        print("📋 Raw wage data: $wageData");
+        print("Raw wage data: $wageData");
 
         // Create Wage object from response
         Wage wage = Wage.fromJson(wageData);
         currentWage.value = wage;
 
-        print(
-            "✅ Created wage object: Employee ID = ${wage.employeeId}, Amount = ${wage.amount}");
+        print("Created wage object: Employee ID = ${wage.employeeId}, Amount = ${wage.amount}");
 
         // Populate form fields
-        await _populateFormFromWage(wage);
+        _populateFormFromWage(wage);
 
-        print("✅ Wage detail loaded and form populated successfully");
+        print("Wage detail loaded and form populated successfully");
       } else {
         String errorMessage = 'Failed to load wage details';
 
@@ -152,12 +143,12 @@ class EditWageController extends GetxController {
           errorMessage = result['data']['message'] ?? errorMessage;
         }
 
-        print("❌ Failed to load wage detail: $errorMessage");
+        print("Failed to load wage detail: $errorMessage");
         MessageService.to.showError('error_loading_wage', errorMessage);
         Get.back();
       }
     } catch (e, stackTrace) {
-      print('❌ Exception in _loadWageDetail: $e');
+      print('Exception in _loadWageDetail: $e');
       print('Stack trace: $stackTrace');
       MessageService.to.showError(
           'error_loading_wage', 'Failed to load wage details: ${e.toString()}');
@@ -165,29 +156,52 @@ class EditWageController extends GetxController {
     }
   }
 
-  /// Populate form fields from wage data - FIXED VERSION
-  Future<void> _populateFormFromWage(Wage wage) async {
+  /// Populate form fields from wage data - SIMPLIFIED VERSION
+  void _populateFormFromWage(Wage wage) {
     print("=== POPULATING FORM FROM WAGE ===");
-    print(
-        "Wage data: Employee ID = ${wage.employeeId}, Amount = ${wage.amount}");
+    print("Wage data: Employee ID = ${wage.employeeId}, Amount = ${wage.amount}");
 
     try {
-      // Set amount with explicit update
+      // Set employee name in read-only field
+      print("Setting employee name: ${wage.employeeName}");
+      employeeNameController.text = wage.employeeName ?? 'Unknown Employee';
+
+      // Set amount with explicit type conversion and null safety
       print("Setting amount: ${wage.amount}");
-      amountController.text = wage.amount.toString();
-      amountText.value = wage.amount.toString();
+      String amountString;
 
-      // Set effective from date
-      String effectiveFromStr =
-          DateFormat('yyyy-MM-dd').format(wage.effectiveFrom);
-      print("Setting effective from: $effectiveFromStr");
-      effectiveFromController.text = effectiveFromStr;
-      effectiveFromDate.value = effectiveFromStr;
+      if (wage.amount == null) {
+        amountString = '0';
+      } else if (wage.amount is int) {
+        amountString = (wage.amount as int).toString();
+      } else if (wage.amount is double) {
+        amountString = (wage.amount as double).toString();
+      } else if (wage.amount is num) {
+        amountString = (wage.amount as num).toString();
+      } else {
+        // Fallback: convert whatever type it is to string
+        amountString = wage.amount.toString();
+      }
 
-      // Set effective to date (optional)
+      amountController.text = amountString;
+      amountText.value = amountString;
+
+      // Set effective from date with null safety
+      if (wage.effectiveFrom != null) {
+        String effectiveFromStr = DateFormat('yyyy-MM-dd').format(wage.effectiveFrom);
+        print("Setting effective from: $effectiveFromStr");
+        effectiveFromController.text = effectiveFromStr;
+        effectiveFromDate.value = effectiveFromStr;
+      } else {
+        print("Effective from date is null, using current date");
+        String currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        effectiveFromController.text = currentDate;
+        effectiveFromDate.value = currentDate;
+      }
+
+      // Set effective to date (optional) with null safety
       if (wage.effectiveTo != null) {
-        String effectiveToStr =
-            DateFormat('yyyy-MM-dd').format(wage.effectiveTo!);
+        String effectiveToStr = DateFormat('yyyy-MM-dd').format(wage.effectiveTo!);
         print("Setting effective to: $effectiveToStr");
         effectiveToController.text = effectiveToStr;
         effectiveToDate.value = effectiveToStr;
@@ -197,201 +211,42 @@ class EditWageController extends GetxController {
         effectiveToDate.value = '';
       }
 
-      // Set remarks
-      print("Setting remarks: ${wage.remarks ?? 'None'}");
-      remarksController.text = wage.remarks ?? '';
+      // Set remarks with null safety
+      String remarksText = wage.remarks ?? '';
+      print("Setting remarks: '$remarksText'");
+      remarksController.text = remarksText;
 
       // Force UI update
       update();
 
-      // Wait for employees to be loaded and then select employee
-      await _waitForEmployeesAndSelect(wage.employeeId);
-
       print("=== FORM POPULATED SUCCESSFULLY ===");
-    } catch (e) {
-      print("❌ Error populating form: $e");
+    } catch (e, stackTrace) {
+      print("Error populating form: $e");
+      print("Stack trace: $stackTrace");
+
+      // Additional debugging information
+      print("Wage amount type: ${wage.amount?.runtimeType}");
+      print("Wage amount value: ${wage.amount}");
+      print("Wage effectiveFrom type: ${wage.effectiveFrom?.runtimeType}");
+      print("Wage effectiveTo type: ${wage.effectiveTo?.runtimeType}");
+      print("Wage remarks type: ${wage.remarks?.runtimeType}");
+
       throw e;
     }
   }
 
-  /// Wait for employees to load and then select the correct employee
-  Future<void> _waitForEmployeesAndSelect(String employeeId) async {
-    int attempts = 0;
-    const maxAttempts = 10;
-    const delay = Duration(milliseconds: 500);
-
-    while (attempts < maxAttempts) {
-      if (employees.isNotEmpty) {
-        print(
-            "👥 Employees loaded (${employees.length}), selecting employee...");
-        selectEmployeeById(employeeId);
-        return;
-      }
-
-      attempts++;
-      print(
-          "⏳ Waiting for employees to load... (attempt $attempts/$maxAttempts)");
-      await Future.delayed(delay);
-    }
-
-    print("❌ Timeout waiting for employees to load");
-    _handleMissingEmployee(employeeId);
-  }
-
-  /// Select employee by ID - IMPROVED VERSION
-  void selectEmployeeById(String employeeId) {
-    print(
-        "🔍 Looking for employee with ID: $employeeId in ${employees.length} employees");
-
-    if (employees.isEmpty) {
-      print("❌ No employees loaded yet");
-      return;
-    }
-
-    try {
-      Employee? employee;
-
-      // Try different ID matching approaches
-      // 1. Exact string match
-      employee =
-          employees.firstWhereOrNull((emp) => emp.id.toString() == employeeId);
-
-      // 2. If not found, try parsing as int and comparing
-      if (employee == null) {
-        int? targetId = int.tryParse(employeeId);
-        if (targetId != null) {
-          employee = employees.firstWhereOrNull((emp) {
-            if (emp.id is int) return emp.id == targetId;
-            if (emp.id is String) return int.tryParse(emp.id) == targetId;
-            return false;
-          });
-        }
-      }
-
-      if (employee != null) {
-        selectedEmployee.value = employee;
-        print(
-            "✅ Found and selected employee: ${employee.name} (ID: ${employee.id})");
-        update(); // Force UI update
-      } else {
-        print("❌ Employee not found with ID: $employeeId");
-        print(
-            "Available employee IDs: ${employees.map((e) => '${e.id}(${e.id.runtimeType})').join(', ')}");
-        _handleMissingEmployee(employeeId);
-      }
-    } catch (e) {
-      print("❌ Error selecting employee: $e");
-      _handleMissingEmployee(employeeId);
-    }
-  }
-
-  /// Enhanced debugging method to check data loading
+  /// Enhanced debugging method to check data loading - SIMPLIFIED
   void debugDataLoading() {
     print("=== DEBUG DATA LOADING ===");
     print("Wage ID: $wageId");
     print("Current wage loaded: ${currentWage.value != null}");
-    print("Employees loaded: ${employees.length}");
-    print("Selected employee: ${selectedEmployee.value?.name}");
+    print("Employee name: '${employeeNameController.text}'");
     print("Amount controller text: '${amountController.text}'");
     print("Effective from controller text: '${effectiveFromController.text}'");
     print("Effective to controller text: '${effectiveToController.text}'");
     print("Remarks controller text: '${remarksController.text}'");
     print("Is loading: ${isLoading.value}");
-    print("Is loading employees: ${isLoadingEmployees.value}");
     print("========================");
-  }
-
-  /// Handle case where employee is not in the current active list
-  void _handleMissingEmployee(String employeeId) {
-    // This could happen if the employee was deactivated after the wage was created
-    // We might want to show a warning or load the specific employee
-    print("⚠️ Employee with ID $employeeId not found in active employees list");
-    MessageService.to.showWarning('employee_not_found',
-        'The employee associated with this wage record may no longer be active');
-  }
-
-  /// Load employees for dropdown selection
-  Future<void> _loadEmployees() async {
-    try {
-      isLoadingEmployees.value = true;
-      print("Starting to load employees for edit...");
-
-      Map<String, dynamic> result = await EmployeeService.getEmployeeList();
-      print("API Result: $result");
-
-      if (result.isEmpty) {
-        print("Error: Empty result from API");
-        MessageService.to.showError(
-            'error_loading_employees', 'No data received from server');
-        return;
-      }
-
-      bool isSuccess = result['success'] == true || result['success'] == 'true';
-
-      if (isSuccess) {
-        List<dynamic> employeeData = [];
-
-        // Handle the specific API structure: result['data']['data']['employees']
-        if (result['data'] != null && result['data'] is Map) {
-          var outerData = result['data'] as Map<String, dynamic>;
-
-          if (outerData['data'] != null && outerData['data'] is Map) {
-            var innerData = outerData['data'] as Map<String, dynamic>;
-
-            if (innerData['employees'] != null &&
-                innerData['employees'] is List) {
-              employeeData = List<dynamic>.from(innerData['employees']);
-              print("Found employees list with ${employeeData.length} items");
-            }
-          }
-        }
-
-        if (employeeData.isEmpty) {
-          print("Warning: No employees found in response");
-          MessageService.to
-              .showError('no_employees_found', 'No employees found');
-          employees.clear();
-          return;
-        }
-
-        // Convert and include ALL employees (both active and inactive)
-        // This is important for edit mode in case the wage is associated with an inactive employee
-        List<Employee> allEmployees = [];
-
-        for (var json in employeeData) {
-          try {
-            Employee emp = Employee.fromJson(json);
-            allEmployees.add(emp);
-          } catch (e) {
-            print("Error parsing employee: $json, Error: $e");
-          }
-        }
-
-        employees.value = allEmployees;
-        print(
-            "Successfully loaded ${allEmployees.length} employees (including inactive)");
-      } else {
-        String errorMessage = result['message'] ?? 'Failed to load employees';
-        print("API Error: $errorMessage");
-        MessageService.to.showError('error_loading_employees', errorMessage);
-      }
-    } catch (e) {
-      print('Exception in _loadEmployees: $e');
-      String errorMessage = 'Error loading employees';
-
-      if (e.toString().contains('SocketException') ||
-          e.toString().contains('NetworkException')) {
-        errorMessage = 'Network error: Please check your internet connection';
-      } else if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'Request timeout: Please try again';
-      } else {
-        errorMessage = 'Error loading employees: ${e.toString()}';
-      }
-
-      MessageService.to.showError('error_loading_employees', errorMessage);
-    } finally {
-      isLoadingEmployees.value = false;
-    }
   }
 
   /// Select effective from date
@@ -446,8 +301,7 @@ class EditWageController extends GetxController {
     // Use current effective to date if available
     if (effectiveToController.text.isNotEmpty) {
       try {
-        DateTime currentEffectiveTo =
-            DateTime.parse(effectiveToController.text);
+        DateTime currentEffectiveTo = DateTime.parse(effectiveToController.text);
         if (currentEffectiveTo.isAfter(firstDate)) {
           initialDate = currentEffectiveTo;
         }
@@ -479,12 +333,6 @@ class EditWageController extends GetxController {
 
   /// Validate form data
   bool _validateForm() {
-    // Employee validation
-    if (selectedEmployee.value == null) {
-      MessageService.to.showEmployeeValidationError();
-      return false;
-    }
-
     // Amount validation
     if (amountController.text.trim().isEmpty) {
       MessageService.to.showAmountValidationError();
@@ -506,10 +354,8 @@ class EditWageController extends GetxController {
     // Date range validation
     if (effectiveToController.text.trim().isNotEmpty) {
       try {
-        DateTime effectiveFrom =
-            DateTime.parse(effectiveFromController.text.trim());
-        DateTime effectiveTo =
-            DateTime.parse(effectiveToController.text.trim());
+        DateTime effectiveFrom = DateTime.parse(effectiveFromController.text.trim());
+        DateTime effectiveTo = DateTime.parse(effectiveToController.text.trim());
 
         if (effectiveTo.isBefore(effectiveFrom)) {
           MessageService.to.showDateRangeValidationError();
@@ -524,21 +370,35 @@ class EditWageController extends GetxController {
     return true;
   }
 
-  /// Convert form data to update request format
+  /// Convert form data to update request format - SIMPLIFIED VERSION
   Map<String, dynamic> _wageToUpdateRequestData() {
     print("=== BUILDING WAGE UPDATE REQUEST DATA ===");
 
     Map<String, dynamic> data = {};
 
-    // Handle employee ID - backend expects 'employee' field but will convert to employee_id
-    var employeeId = selectedEmployee.value!.id;
-    if (employeeId is String) {
-      var parsedId = int.tryParse(employeeId);
-      data['employee'] = parsedId ?? employeeId;
+    // SIMPLIFIED: Use employee ID from current wage data (no selection needed)
+    if (currentWage.value?.employeeId != null) {
+      var employeeId = currentWage.value!.employeeId;
+
+      // Convert employee ID to the format expected by backend
+      if (employeeId is String) {
+        var parsedId = int.tryParse(employeeId);
+        data['employee'] = parsedId ?? employeeId;
+      } else if (employeeId is int) {
+        data['employee'] = employeeId;
+      } else {
+        // Fallback - convert to string then try to parse
+        var empIdStr = employeeId.toString();
+        var parsedId = int.tryParse(empIdStr);
+        data['employee'] = parsedId ?? empIdStr;
+      }
+
+      print("Employee ID: ${data['employee']} (${data['employee'].runtimeType})");
+      print("Original employee ID from wage: $employeeId (${employeeId.runtimeType})");
     } else {
-      data['employee'] = employeeId;
+      print("ERROR: No employee ID found in current wage data");
+      throw Exception("Employee ID not available");
     }
-    print("Employee ID: ${data['employee']} (${data['employee'].runtimeType})");
 
     // Handle amount
     var amountText = amountController.text.trim();
@@ -554,7 +414,6 @@ class EditWageController extends GetxController {
       data['effective_to'] = effectiveToController.text.trim();
       print("Effective to: '${data['effective_to']}'");
     } else {
-      // Explicitly set to null to clear the field
       data['effective_to'] = null;
       print("Effective to: null (clearing end date)");
     }
@@ -564,7 +423,6 @@ class EditWageController extends GetxController {
       data['remarks'] = remarksController.text.trim();
       print("Remarks: '${data['remarks']}'");
     } else {
-      // Explicitly set to null to clear the field
       data['remarks'] = null;
       print("Remarks: null (clearing remarks)");
     }
@@ -590,7 +448,7 @@ class EditWageController extends GetxController {
     print("=== STARTING WAGE UPDATE PROCESS ===");
 
     if (!_validateForm()) {
-      print("❌ Form validation failed, not updating");
+      print("Form validation failed, not updating");
       return;
     }
 
@@ -606,7 +464,7 @@ class EditWageController extends GetxController {
         wageData: wageData,
       );
 
-      print("📥 API Response: $result");
+      print("API Response: $result");
 
       if (result['success'] == true) {
         String message = 'Wage record updated successfully';
@@ -615,7 +473,7 @@ class EditWageController extends GetxController {
           message = result['data']['message'] ?? message;
         }
 
-        print("✅ Wage updated successfully: $message");
+        print("Wage updated successfully: $message");
         MessageService.to.showSuccess('success_wage_updated', message);
 
         // Give user time to see the success message
@@ -640,18 +498,16 @@ class EditWageController extends GetxController {
           }
         }
 
-        print("❌ API Error: $errorMessage");
+        print("API Error: $errorMessage");
         MessageService.to.showError('error_wage_update', errorMessage);
       }
     } catch (e, stackTrace) {
-      print('❌ Exception in updateWage: $e');
+      print('Exception in updateWage: $e');
       print('Stack trace: $stackTrace');
 
-      String errorMessage =
-          'Network error: Please check your connection and try again';
+      String errorMessage = 'Network error: Please check your connection and try again';
       if (e.toString().contains('SocketException')) {
-        errorMessage =
-            'Network connection error. Please check your internet connection.';
+        errorMessage = 'Network connection error. Please check your internet connection.';
       } else if (e.toString().contains('TimeoutException')) {
         errorMessage = 'Request timeout. Please try again.';
       }
@@ -670,10 +526,6 @@ class EditWageController extends GetxController {
 
     Wage original = currentWage.value!;
 
-    // Check employee change
-    if (selectedEmployee.value?.id.toString() != original.employeeId)
-      return true;
-
     // Check amount change
     double? currentAmount = double.tryParse(amountController.text.trim());
     if (currentAmount != null && currentAmount != original.amount) return true;
@@ -681,8 +533,7 @@ class EditWageController extends GetxController {
     // Check effective from date change
     if (effectiveFromController.text.trim().isNotEmpty) {
       try {
-        DateTime currentEffectiveFrom =
-            DateTime.parse(effectiveFromController.text.trim());
+        DateTime currentEffectiveFrom = DateTime.parse(effectiveFromController.text.trim());
         DateTime originalDate = DateTime(original.effectiveFrom.year,
             original.effectiveFrom.month, original.effectiveFrom.day);
         DateTime currentDate = DateTime(currentEffectiveFrom.year,
@@ -696,8 +547,7 @@ class EditWageController extends GetxController {
 
     // Check effective to date change
     String currentEffectiveTo = effectiveToController.text.trim();
-    if (original.effectiveTo == null && currentEffectiveTo.isNotEmpty)
-      return true;
+    if (original.effectiveTo == null && currentEffectiveTo.isNotEmpty) return true;
     if (original.effectiveTo != null && currentEffectiveTo.isEmpty) return true;
     if (original.effectiveTo != null && currentEffectiveTo.isNotEmpty) {
       try {
@@ -732,8 +582,7 @@ class EditWageController extends GetxController {
     if (hasChanges) {
       Get.defaultDialog(
         title: 'Unsaved Changes',
-        middleText:
-            'You have unsaved changes. Are you sure you want to go back?',
+        middleText: 'You have unsaved changes. Are you sure you want to go back?',
         textConfirm: 'Yes, Go Back',
         textCancel: 'Stay',
         confirmTextColor: Colors.white,
@@ -746,11 +595,6 @@ class EditWageController extends GetxController {
     } else {
       Get.back();
     }
-  }
-
-  /// Refresh employees list
-  Future<void> refreshEmployees() async {
-    await _loadEmployees();
   }
 
   /// Navigate to view wages
@@ -774,20 +618,6 @@ class EditWageController extends GetxController {
     }
   }
 
-  /// Get employee display name for dropdown
-  String getEmployeeDisplayName(Employee employee) {
-    String displayName = '${employee.name} (${employee.empType})';
-    if (employee.status != true) {
-      displayName += ' - Inactive';
-    }
-    return displayName;
-  }
-
-  /// Check if employee is already selected
-  bool isEmployeeSelected(Employee employee) {
-    return selectedEmployee.value?.id == employee.id;
-  }
-
   /// Get formatted amount preview - now reactive
   String get formattedAmountPreview {
     if (amountText.value.trim().isEmpty) return '₹0.00';
@@ -795,7 +625,7 @@ class EditWageController extends GetxController {
     double? amount = double.tryParse(amountText.value.trim());
     if (amount == null) return '₹0.00';
 
-    return '₹${amount.toStringAsFixed(2)}';
+    return '₹${amount.toStringAsFixed(0)}';
   }
 
   /// Get date range preview - now reactive
@@ -803,8 +633,7 @@ class EditWageController extends GetxController {
     if (effectiveFromDate.value.isEmpty) return 'No date selected';
 
     String fromDate = effectiveFromDate.value;
-    String toDate =
-        effectiveToDate.value.isEmpty ? 'Ongoing' : effectiveToDate.value;
+    String toDate = effectiveToDate.value.isEmpty ? 'Ongoing' : effectiveToDate.value;
 
     return '$fromDate - $toDate';
   }
@@ -860,23 +689,19 @@ class EditWageController extends GetxController {
   }
 
   /// Quick validation methods for UI feedback
-  bool get isEmployeeValid => selectedEmployee.value != null;
-
   bool get isAmountValid {
     if (amountController.text.trim().isEmpty) return false;
     double? amount = double.tryParse(amountController.text.trim());
     return amount != null && amount > 0;
   }
 
-  bool get isEffectiveFromValid =>
-      effectiveFromController.text.trim().isNotEmpty;
+  bool get isEffectiveFromValid => effectiveFromController.text.trim().isNotEmpty;
 
   bool get isDateRangeValid {
     if (effectiveToController.text.trim().isEmpty) return true;
 
     try {
-      DateTime effectiveFrom =
-          DateTime.parse(effectiveFromController.text.trim());
+      DateTime effectiveFrom = DateTime.parse(effectiveFromController.text.trim());
       DateTime effectiveTo = DateTime.parse(effectiveToController.text.trim());
       return !effectiveTo.isBefore(effectiveFrom);
     } catch (e) {
@@ -885,11 +710,7 @@ class EditWageController extends GetxController {
   }
 
   /// Get form validation status
-  bool get isFormValid =>
-      isEmployeeValid &&
-      isAmountValid &&
-      isEffectiveFromValid &&
-      isDateRangeValid;
+  bool get isFormValid => isAmountValid && isEffectiveFromValid && isDateRangeValid;
 
   /// Get current wage details for display
   String get originalWageInfo {
@@ -897,5 +718,15 @@ class EditWageController extends GetxController {
 
     Wage wage = currentWage.value!;
     return 'Original: ${wage.employeeName} - ${wage.formattedAmountClean} (${wage.formattedDateRange})';
+  }
+
+  /// Get employee name for display
+  String get employeeName {
+    return employeeNameController.text;
+  }
+
+  /// Check if employee data is loaded
+  bool get isEmployeeDataLoaded {
+    return currentWage.value?.employeeName != null;
   }
 }

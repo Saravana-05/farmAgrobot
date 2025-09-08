@@ -21,6 +21,19 @@ abstract class Routes {
   static const EDIT_ATTENDANCE = _Paths.EDIT_ATTENDANCE;
   static const ATTENDANCE = _Paths.ATTENDANCE;
   static const EMPLOYEE_DETAILS = _Paths.EMPLOYEE_DETAILS;
+  static const CROPS = _Paths.CROPS;
+  static const SETTINGS = _Paths.SETTINGS;
+  static const ADD_CROPS = _Paths.ADD_CROPS;
+  static const EDIT_CROPS = _Paths.EDIT_CROPS;
+  static const VIEW_CROPS = _Paths.VIEW_CROPS;
+  static const CROPS_VARIANTS = _Paths.CROPS_VARIANTS;
+  static const ADD_CROPS_VARIANTS = _Paths.ADD_CROPS_VARIANTS;
+  static const VIEW_CROPS_VARIANTS = _Paths.VIEW_CROPS_VARIANTS;
+  static const EDIT_CROPS_VARIANTS = _Paths.EDIT_CROPS_VARIANTS;
+  static const MERCHANT = _Paths.MERCHANT;
+  static const ADD_MERCHANT = _Paths.ADD_MERCHANT;
+  static const VIEW_MERCHANT = _Paths.VIEW_MERCHANT;
+  static const EDIT_MERCHANT = _Paths.EDIT_MERCHANT;
 }
 
 abstract class _Paths {
@@ -44,4 +57,17 @@ abstract class _Paths {
   static const EDIT_ATTENDANCE = '/edit_attendance';
   static const ATTENDANCE = '/attendance';
   static const EMPLOYEE_DETAILS = '/employee_details';
+  static const CROPS = '/crops';
+  static const ADD_CROPS = '/add_crops';
+  static const SETTINGS = '/settings';
+  static const EDIT_CROPS = '/edit_crops';
+  static const VIEW_CROPS = '/view_crops';
+  static const CROPS_VARIANTS = '/crop_variants';
+  static const ADD_CROPS_VARIANTS = '/add_crop_variants';
+  static const VIEW_CROPS_VARIANTS = '/view_crop_variants';
+  static const EDIT_CROPS_VARIANTS = '/edit_crop_variants';
+  static const MERCHANT = '/merchants';
+  static const ADD_MERCHANT = '/add_merchant';
+  static const VIEW_MERCHANT = '/view_merchant';
+  static const EDIT_MERCHANT = '/edit_merchant';
 }

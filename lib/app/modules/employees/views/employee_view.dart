@@ -268,7 +268,7 @@ class ViewEmployees extends StatelessWidget {
                               _showEmployeeDetailsDialog(employee);
                               break;
                             case 'edit':
-                             // Updated to use Get.to() navigation
+                              // Updated to use Get.to() navigation
                               Get.toNamed(Routes.EDIT_EMPLOYEE,
                                   arguments: {'id': employee.id.toString()});
                               break;
@@ -426,7 +426,7 @@ class ViewEmployees extends StatelessWidget {
         // Next button
         ElevatedButton.icon(
           onPressed: controller.hasNext.value ? controller.nextPage : null,
-          icon: Icon(Icons.chevron_right,color: kLightColor),
+          icon: Icon(Icons.chevron_right, color: kLightColor),
           label: Text('Next'),
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryColor,
@@ -584,7 +584,8 @@ class ViewEmployees extends StatelessWidget {
                           Get.snackbar('Info', 'Edit functionality');
                         },
                         icon: Icon(Icons.edit_outlined, color: kPrimaryColor),
-                        label: Text('Edit'),
+                        label:
+                            Text('Edit', style: TextStyle(color: kBlackColor)),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: kPrimaryColor),
                           padding: EdgeInsets.symmetric(vertical: 12),

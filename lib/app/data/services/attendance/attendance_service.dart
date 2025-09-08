@@ -43,8 +43,6 @@ class AttendanceService {
           if (responseData.containsKey('employees') &&
               responseData.containsKey('week_start_date') &&
               responseData.containsKey('week_end_date')) {
-           
-
             // Print employee details for debugging
             if (responseData['employees'] is List) {
               List employees = responseData['employees'];
@@ -370,7 +368,6 @@ class AttendanceService {
           )
           .timeout(Duration(seconds: timeoutDuration));
 
-
       return {
         'success': response.statusCode == 200,
         'statusCode': response.statusCode,
@@ -616,7 +613,7 @@ class AttendanceService {
   static Future<Map<String, dynamic>> getActiveEmployees() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/get-active-employees/'),
+        Uri.parse(getActiveEmployeesUrl),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -740,6 +737,97 @@ class AttendanceService {
     }
   }
 
+  /// Generate weekly wage PDF
+  static Future<Map<String, dynamic>> generateWeeklyWagePdf({
+    required DateTime weekStart,
+  }) async {
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(weekStart);
+      final uri = Uri.parse(pdfExport)
+          .replace(queryParameters: {'week_start': formattedDate});
+
+      print('Calling PDF generation API: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/pdf, application/json', // Accept both types
+        },
+      ).timeout(Duration(seconds: AttendanceService.timeoutDuration));
+
+      print('PDF API Response status: ${response.statusCode}');
+      print(
+          'PDF API Response content-type: ${response.headers['content-type']}');
+
+      if (response.statusCode == 200) {
+        // Check if response is PDF or JSON based on content-type
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('application/pdf')) {
+          // PDF data received as bytes
+          final pdfBytes = response.bodyBytes;
+
+          return {
+            'success': true,
+            'data': pdfBytes,
+            'message': 'PDF generated successfully',
+          };
+        } else {
+          // Handle unexpected successful JSON response
+          return {
+            'success': false,
+            'data': null,
+            'message': 'Unexpected response format: $contentType',
+          };
+        }
+      } else {
+        // Handle error response
+        String errorMessage = 'Failed to generate PDF';
+
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (e) {
+          // If response is not JSON, use the body as error message
+          errorMessage = response.body.isNotEmpty
+              ? response.body
+              : 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
+        }
+
+        return {
+          'success': false,
+          'data': null,
+          'message': errorMessage,
+        };
+      }
+    } on SocketException catch (e) {
+      print('Network error in PDF generation: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message':
+            'Network connection error. Please check your internet connection.',
+      };
+    } on TimeoutException catch (e) {
+      print('Timeout error in PDF generation: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message': 'Request timeout. Please try again.',
+      };
+    } catch (e) {
+      print('PDF generation error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message': 'An unexpected error occurred: ${e.toString()}',
+      };
+    }
+  }
+
   /// Convert API response to WeeklyData model
   static WeeklyData weeklyDataFromJson(Map<String, dynamic> json) {
     return WeeklyData.fromJson(json);
@@ -761,8 +849,11 @@ class AttendanceService {
   }
 
   /// Convert API response to Employee list
-  static List<EmployeeAttendanceRecord> employeeListFromJson(List<dynamic> jsonList) {
-    return jsonList.map((json) => EmployeeAttendanceRecord.fromJson(json)).toList();
+  static List<EmployeeAttendanceRecord> employeeListFromJson(
+      List<dynamic> jsonList) {
+    return jsonList
+        .map((json) => EmployeeAttendanceRecord.fromJson(json))
+        .toList();
   }
 
   /// Convert EmployeeAttendance to JSON for API requests
@@ -775,6 +866,181 @@ class AttendanceService {
   static Map<String, dynamic> wagePaymentRequestToJson(
       WagePaymentRequest request) {
     return request.toJson();
+  }
+
+  /// Get comprehensive employee report
+  static Future<Map<String, dynamic>> getEmployeeReport({
+    required String employeeId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      // Format dates for API
+      final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+      final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+      // Build query parameters
+      final queryParams = {
+        'start_date': startDateStr,
+        'end_date': endDateStr,
+      };
+
+      final uri = Uri.parse(empReport).replace(queryParameters: queryParams);
+
+      print('Calling API: ${uri.toString()}'); // Debug log
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          // Add authentication headers if needed
+          // 'Authorization': 'Bearer YOUR_TOKEN',
+        },
+      );
+
+      print('Response status: ${response.statusCode}'); // Debug log
+      print('Response body: ${response.body}'); // Debug log
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        // Find the specific employee data from the comprehensive report
+        final employeesReport = data['employees_detailed_report'] as List?;
+
+        if (employeesReport != null) {
+          // Find the employee by ID
+          final employeeData = employeesReport.firstWhere(
+            (emp) => emp['employee_id'].toString() == employeeId,
+            orElse: () => null,
+          );
+
+          if (employeeData != null) {
+            return {
+              'success': true,
+              'data': employeeData,
+            };
+          } else {
+            return {
+              'success': false,
+              'data': null,
+              'message': 'Employee not found in report',
+            };
+          }
+        } else {
+          return {
+            'success': false,
+            'data': null,
+            'message': 'No employee data found in response',
+          };
+        }
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'data': null,
+          'message': 'Employee report endpoint not found',
+        };
+      } else {
+        // Try to parse error response
+        try {
+          final errorData = json.decode(response.body);
+          return {
+            'success': false,
+            'data': null,
+            'message': errorData['error'] ?? 'API request failed',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'data': null,
+            'message': 'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+          };
+        }
+      }
+    } catch (e) {
+      print('Exception in getEmployeeReport: $e'); // Debug log
+      return {
+        'success': false,
+        'data': null,
+        'message': 'Network error: ${e.toString()}',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSingleEmployeeReport({
+    required String employeeId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      // Format dates for API
+      final startDateStr = DateFormat('yyyy-MM-dd').format(startDate);
+      final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+      // Build the endpoint URL using the API config constant
+      final String endpoint =
+          singleEmployeeReportUrl.replaceAll('{id}', employeeId);
+      // Build query parameters
+      final queryParams = {
+        'start_date': startDateStr,
+        'end_date': endDateStr,
+      };
+
+      final uri = Uri.parse(endpoint).replace(queryParameters: queryParams);
+
+      print('Calling single employee API: ${uri.toString()}'); // Debug log
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Response status: ${response.statusCode}'); // Debug log
+      print('Response body: ${response.body}'); // Debug log
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        // Ensure the response has the expected structure
+        return {
+          'success': true,
+          'data': responseData['data'] ?? responseData,
+          'message': responseData['message'] ?? 'Success',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'data': null,
+          'error': 'Employee not found',
+        };
+      } else {
+        // Try to parse error response
+        try {
+          final errorData = json.decode(response.body);
+          return {
+            'success': false,
+            'data': null,
+            'error': errorData['error'] ??
+                errorData['message'] ??
+                'API request failed',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'data': null,
+            'error': 'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+          };
+        }
+      }
+    } catch (e) {
+      print('Exception in getSingleEmployeeReport: $e'); // Debug log
+      return {
+        'success': false,
+        'data': null,
+        'error': 'Network error: ${e.toString()}',
+      };
+    }
   }
 }
 

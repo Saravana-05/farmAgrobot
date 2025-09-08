@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
 import '../../../data/services/attendance/attendance_service.dart';
 import '../../../data/models/attendance/attendance_record_model.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AttendanceUIController extends GetxController {
   // Core data observables
@@ -42,6 +46,8 @@ class AttendanceUIController extends GetxController {
   var fromDate = Rxn<DateTime>();
   var toDate = Rxn<DateTime>();
 
+  var isPdfGenerating = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -79,39 +85,18 @@ class AttendanceUIController extends GetxController {
 
       print('=== CONTROLLER DEBUG ===');
       print('Response success: ${response['success']}');
-      print('Response keys: ${response.keys}');
-      print('Data exists: ${response['data'] != null}');
 
       if (response['success'] == true && response['data'] != null) {
         print('API call successful, processing data...');
 
-        // CRITICAL: Debug the data before parsing
         final rawData = response['data'];
-        print('Raw data type: ${rawData.runtimeType}');
-        print('Raw data keys: ${rawData.keys}');
-
-        if (rawData.containsKey('employees')) {
-          print('Raw employees count: ${rawData['employees']?.length ?? 0}');
-          print('Raw employees data: ${rawData['employees']}');
-        }
-
-        // Parse using the model
-        print('Parsing with WeeklyData.fromJson...');
         final weeklyDataModel = WeeklyData.fromJson(rawData);
 
-        // CRITICAL: Debug the parsed model
-        print('=== PARSED MODEL DEBUG ===');
-        print('Parsed employees count: ${weeklyDataModel.employees.length}');
-        for (int i = 0; i < weeklyDataModel.employees.length; i++) {
-          final emp = weeklyDataModel.employees[i];
-          print(
-              'Parsed employee $i: ID=${emp.employeeId}, Name="${emp.employeeName}"');
-        }
-
         weeklyData.value = weeklyDataModel;
-
-        print('Processing weekly data...');
         await _processWeeklyData(weeklyDataModel);
+
+        // CRITICAL: Ensure UI updates after processing
+        _refreshPaymentUI();
 
         _showSuccessMessage('Weekly data loaded successfully');
       } else {
@@ -128,122 +113,121 @@ class AttendanceUIController extends GetxController {
   }
 
   /// Process weekly data and update local state
+  /// Process weekly data and update local state
   Future<void> _processWeeklyData(WeeklyData data) async {
-    print('=== PROCESSING WEEKLY DATA ===');
-    print('Input data employees count: ${data.employees.length}');
-
     _clearLocalData();
 
-    // FIXED: Create employee map from API response data
     Map<String, EmployeeAttendanceRecord> employeeMap = {};
 
     // Process employees from the weekly data response
     for (int i = 0; i < data.employees.length; i++) {
-      var empData = data.employees[i];
-      print('Processing employee $i:');
-      print('  - ID: ${empData.employeeId}');
-      print('  - Name: "${empData.employeeName}"');
-      print('  - Daily Wage: ${empData.dailyWage}');
-      print('  - Attendance entries: ${empData.attendance.length}');
-
-      // Create employee record
-      employeeMap[empData.employeeId] = EmployeeAttendanceRecord(
-        id: empData.employeeId,
-        name: empData.employeeName,
-        dailyWage: empData.dailyWage,
-        hasWage: true,
-      );
-
-      // Store attendance records - Handle null status values
-      attendanceRecords[empData.employeeId] = {};
-      empData.attendance.forEach((dateString, status) {
-        final date = DateTime.tryParse(dateString);
-        if (date != null && status != null) {
-          attendanceRecords[empData.employeeId]![date] = status;
-        }
-      });
-
-      // Store payment information
-      employeePaymentStatus[empData.employeeId] = empData.paymentStatus;
-      employeePartialPayments[empData.employeeId] = empData.partialPayment;
-      employeeRemainingAmounts[empData.employeeId] = empData.remainingAmount;
-    }
-
-    // FIXED: If no employees in weekly data, fetch active employees as fallback
-    if (employeeMap.isEmpty) {
-      print('No employees in weekly data, fetching active employees...');
       try {
-        final response = await AttendanceService.getActiveEmployees();
-        if (response['success'] == true && response['data'] != null) {
-          final apiData = response['data'];
+        var empData = data.employees[i];
+        
+        print('Processing employee $i: ${empData.employeeId}');
+        print('Employee data type check:');
+        print('  employeeId: ${empData.employeeId.runtimeType}');
+        print('  employeeName: ${empData.employeeName.runtimeType}');
+        print('  dailyWage: ${empData.dailyWage.runtimeType}');
+        print('  attendance: ${empData.attendance.runtimeType}');
 
-          if (apiData.containsKey('employees') &&
-              apiData['employees'] is List) {
-            final employeeList = apiData['employees'] as List;
+        // Create employee record with validation
+        final employeeId = empData.employeeId?.toString() ?? '';
+        final employeeName = empData.employeeName?.toString() ?? 'Unknown';
+        final dailyWage = _parseDouble(empData.dailyWage) ?? 0.0;
 
-            for (var empJson in employeeList) {
-              final employeeId = empJson['employee_id'].toString();
-              final employee = EmployeeAttendanceRecord(
-                id: employeeId,
-                name: empJson['employee_name'].toString(),
-                dailyWage:
-                    double.tryParse(empJson['daily_wage'].toString()) ?? 0.0,
-                hasWage: empJson['has_wage'] ?? false,
-              );
+        if (employeeId.isEmpty) {
+          print('Warning: Empty employee ID for employee at index $i, skipping');
+          continue;
+        }
 
-              employeeMap[employee.id] = employee;
+        employeeMap[employeeId] = EmployeeAttendanceRecord(
+          id: employeeId,
+          name: employeeName,
+          dailyWage: dailyWage,
+          hasWage: true,
+        );
 
-              // Initialize empty attendance and payment data
-              if (!attendanceRecords.containsKey(employeeId)) {
-                attendanceRecords[employeeId] = {};
+        // Store attendance records with proper parsing
+        attendanceRecords[employeeId] = {};
+        
+        // Handle attendance data safely
+        if (empData.attendance != null) {
+          if (empData.attendance is Map) {
+            final attendanceMap = empData.attendance as Map;
+            attendanceMap.forEach((key, value) {
+              final dateString = key.toString();
+              final date = DateTime.tryParse(dateString);
+              
+              if (date != null) {
+                // Parse status value safely
+                int? status;
+                if (value is int) {
+                  status = value;
+                } else if (value is String) {
+                  status = int.tryParse(value);
+                } else if (value is double) {
+                  status = value.toInt();
+                } else {
+                  // print('Warning: Unknown attendance status type for $employeeId on $dateString: ${value.runtimeType}');
+                  // continue;
+                }
+                
+                if (status != null && [0, 1, 2, 3].contains(status)) {
+                  attendanceRecords[employeeId]![date] = status;
+                } else {
+                  print('Warning: Invalid attendance status $status for $employeeId on $dateString');
+                }
+              } else {
+                print('Warning: Invalid date format $dateString for employee $employeeId');
               }
-              if (!employeePaymentStatus.containsKey(employeeId)) {
-                employeePaymentStatus[employeeId] = 'pending';
-                employeePartialPayments[employeeId] = 0.0;
-                employeeRemainingAmounts[employeeId] = 0.0;
-              }
-            }
-
-            print('Loaded ${employeeMap.length} active employees as fallback');
+            });
+          } else {
+            print('Warning: Expected Map for attendance data, got ${empData.attendance.runtimeType}');
           }
         }
-      } catch (e) {
-        print('Error loading active employees: $e');
+
+        // Store payment information with safe parsing and validation
+        final paymentStatus = empData.paymentStatus?.toString() ?? 'pending';
+        final partialPayment = _parseDouble(empData.partialPayment) ?? 0.0;
+        final remainingAmount = _parseDouble(empData.remainingAmount) ?? 0.0;
+
+        employeePaymentStatus[employeeId] = paymentStatus;
+        employeePartialPayments[employeeId] = partialPayment;
+        employeeRemainingAmounts[employeeId] = remainingAmount;
+
+        print('Successfully processed employee payment data:');
+        print('  ID: $employeeId');
+        print('  Name: $employeeName');
+        print('  Daily Wage: $dailyWage');
+        print('  Payment Status: $paymentStatus');
+        print('  Partial Payment: $partialPayment');
+        print('  Remaining Amount: $remainingAmount');
+        print('  Attendance Records: ${attendanceRecords[employeeId]?.length ?? 0}');
+
+      } catch (e, stackTrace) {
+        print('Error processing employee $i: $e');
+        print('Stack trace: $stackTrace');
+        print('Employee data: ${data.employees[i]}');
+        
+        // Continue processing other employees instead of failing completely
+        continue;
       }
+    }
+
+    // Handle case where no employees in weekly data
+    if (employeeMap.isEmpty) {
+      await _loadActiveEmployeesAsFallback(employeeMap);
     }
 
     // Convert map back to list
     employees.value = employeeMap.values.toList();
 
     // Ensure all employees have initialized payment data
-    for (var employee in employees) {
-      if (!employeePaymentStatus.containsKey(employee.id)) {
-        employeePaymentStatus[employee.id] = 'pending';
-        employeePartialPayments[employee.id] = 0.0;
-        employeeRemainingAmounts[employee.id] = 0.0;
-      }
-      if (!attendanceRecords.containsKey(employee.id)) {
-        attendanceRecords[employee.id] = {};
-      }
-    }
-
-    print('=== AFTER PROCESSING ===');
-    print('Final employees count: ${employees.length}');
-    for (int i = 0; i < employees.length; i++) {
-      final emp = employees[i];
-      print('Final employee $i: ID=${emp.id}, Name="${emp.name}"');
-    }
+    _ensurePaymentDataInitialized();
 
     // Apply employee ordering
-    print('Applying employee ordering...');
     _applyEmployeeOrdering();
-
-    print('=== AFTER ORDERING ===');
-    print('Ordered employees count: ${employees.length}');
-    for (int i = 0; i < employees.length; i++) {
-      final emp = employees[i];
-      print('Ordered employee $i: ID=${emp.id}, Name="${emp.name}"');
-    }
 
     // Set wage information
     grandTotalWages.value = data.totalWages;
@@ -253,6 +237,125 @@ class AttendanceUIController extends GetxController {
     _calculateEmployeeCounts(data);
 
     print('=== PROCESSING COMPLETE ===');
+    print('Final employees count: ${employees.length}');
+    print('Employees processed: ${employees.map((e) => '${e.id}:${e.name}').join(', ')}');
+  }
+
+  /// Helper method to safely parse double values
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    
+    print('Warning: Cannot parse double from ${value.runtimeType}: $value');
+    return null;
+  }
+
+  /// Enhanced method to ensure payment data is initialized for all employees
+  void _ensurePaymentDataInitialized() {
+    for (var employee in employees) {
+      // Initialize payment status if not exists
+      if (!employeePaymentStatus.containsKey(employee.id)) {
+        employeePaymentStatus[employee.id] = 'pending';
+        print('Initialized payment status for ${employee.id}: pending');
+      }
+
+      // Initialize partial payment if not exists
+      if (!employeePartialPayments.containsKey(employee.id)) {
+        employeePartialPayments[employee.id] = 0.0;
+        print('Initialized partial payment for ${employee.id}: 0.0');
+      }
+
+      // Initialize or calculate remaining amount
+      if (!employeeRemainingAmounts.containsKey(employee.id)) {
+        final totalWages = getTotalWages(employee.id);
+        final partialPayment = employeePartialPayments[employee.id] ?? 0.0;
+        employeeRemainingAmounts[employee.id] = totalWages - partialPayment;
+        print('Calculated remaining amount for ${employee.id}: ${employeeRemainingAmounts[employee.id]}');
+      }
+
+      // Initialize attendance records if not exists
+      if (!attendanceRecords.containsKey(employee.id)) {
+        attendanceRecords[employee.id] = {};
+        print('Initialized attendance records for ${employee.id}');
+      }
+
+      // Validate payment data consistency
+      _validatePaymentDataConsistency(employee.id);
+    }
+  }
+
+  /// Validate payment data consistency for an employee
+  void _validatePaymentDataConsistency(String employeeId) {
+    final totalWages = getTotalWages(employeeId);
+    final partialPayment = employeePartialPayments[employeeId] ?? 0.0;
+    final remainingAmount = employeeRemainingAmounts[employeeId] ?? 0.0;
+    final paymentStatus = employeePaymentStatus[employeeId] ?? 'pending';
+
+    // Check if calculations are consistent
+    final expectedRemaining = totalWages - partialPayment;
+    
+    if ((expectedRemaining - remainingAmount).abs() > 0.01) {
+      print('Warning: Payment data inconsistency for $employeeId');
+      print('  Total Wages: $totalWages');
+      print('  Partial Payment: $partialPayment');
+      print('  Stored Remaining: $remainingAmount');
+      print('  Expected Remaining: $expectedRemaining');
+      
+      // Auto-correct the remaining amount
+      employeeRemainingAmounts[employeeId] = expectedRemaining > 0 ? expectedRemaining : 0.0;
+    }
+
+    // Check if status matches payment amounts
+    if (partialPayment >= totalWages && paymentStatus != 'paid') {
+      print('Auto-correcting payment status for $employeeId from $paymentStatus to paid');
+      employeePaymentStatus[employeeId] = 'paid';
+      employeeRemainingAmounts[employeeId] = 0.0;
+    } else if (partialPayment > 0 && partialPayment < totalWages && paymentStatus == 'pending') {
+      print('Auto-correcting payment status for $employeeId from $paymentStatus to partial');
+      employeePaymentStatus[employeeId] = 'partial';
+    }
+  }
+
+  
+
+  /// NEW METHOD: Load active employees as fallback
+  Future<void> _loadActiveEmployeesAsFallback(
+      Map<String, EmployeeAttendanceRecord> employeeMap) async {
+    try {
+      final response = await AttendanceService.getActiveEmployees();
+      if (response['success'] == true && response['data'] != null) {
+        final apiData = response['data'];
+
+        if (apiData.containsKey('employees') && apiData['employees'] is List) {
+          final employeeList = apiData['employees'] as List;
+
+          for (var empJson in employeeList) {
+            final employeeId = empJson['employee_id'].toString();
+            final employee = EmployeeAttendanceRecord(
+              id: employeeId,
+              name: empJson['employee_name'].toString(),
+              dailyWage:
+                  double.tryParse(empJson['daily_wage'].toString()) ?? 0.0,
+              hasWage: empJson['has_wage'] ?? false,
+            );
+
+            employeeMap[employee.id] = employee;
+
+            // Initialize payment data for fallback employees
+            employeePaymentStatus[employeeId] = 'pending';
+            employeePartialPayments[employeeId] = 0.0;
+            employeeRemainingAmounts[employeeId] = 0.0;
+          }
+
+          print('Loaded ${employeeMap.length} active employees as fallback');
+        }
+      }
+    } catch (e) {
+      print('Error loading active employees: $e');
+    }
   }
 
   /// Fetch active employees
@@ -297,8 +400,6 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  // MARK: - Attendance Management
-
   /// Update single employee attendance
   Future<void> updateAttendance(
     String employeeId,
@@ -306,6 +407,22 @@ class AttendanceUIController extends GetxController {
     DateTime date,
     int status,
   ) async {
+    // Validation checks
+    if (employeeId.isEmpty) {
+      _showErrorMessage('Employee ID cannot be empty');
+      return;
+    }
+
+    if (employeeName.isEmpty) {
+      _showErrorMessage('Employee name cannot be empty');
+      return;
+    }
+
+    if (![0, 1, 2, 3].contains(status)) {
+      _showErrorMessage('Invalid attendance status: $status');
+      return;
+    }
+
     if (_checkWagesPaidRestriction()) return;
     if (isUpdatingAttendance.value) return;
 
@@ -313,6 +430,12 @@ class AttendanceUIController extends GetxController {
     isUpdatingAttendance.value = true;
 
     try {
+      print('Updating attendance for:');
+      print('  Employee ID: $employeeId');
+      print('  Employee Name: $employeeName');
+      print('  Date: $normalizedDate');
+      print('  Status: $status');
+
       final response = await AttendanceService.updateSingleAttendance(
         employeeId: employeeId,
         employeeName: employeeName,
@@ -320,20 +443,39 @@ class AttendanceUIController extends GetxController {
         status: status,
       );
 
-      if (response['success'] == true) {
-        // Update local state immediately for better UX
-        _updateLocalAttendance(employeeId, normalizedDate, status);
+      print('API Response: $response');
 
-        // Refresh data in background
+      if (response['success'] == true) {
+        // Success case
+        _updateLocalAttendance(employeeId, normalizedDate, status);
         await fetchWeeklyData();
 
-        _showSuccessMessage(
-            response['data']['message'] ?? 'Attendance updated successfully');
+        final successMessage =
+            response['data']['message'] ?? 'Attendance updated successfully';
+        _showSuccessMessage(successMessage);
       } else {
-        _handleApiError(response);
+        // Handle API errors (400, 404, etc.)
+        final responseData = response['data'] ?? {};
+
+        // Extract error message from API response
+        String errorMessage = responseData['error'] ??
+            responseData['message'] ??
+            'Failed to update attendance';
+
+        // Add status code context for debugging if needed
+        final statusCode = response['statusCode'];
+        if (statusCode != null && statusCode >= 500) {
+          errorMessage = 'Server error occurred. Please try again later.';
+        }
+
+        _showErrorMessage(errorMessage);
       }
     } catch (e) {
-      _handleException('Failed to update attendance', e);
+      print('Error in updateAttendance: $e');
+
+      // This catch block should now only handle unexpected errors
+      // since network/timeout errors are already handled in the service
+      _showErrorMessage('An unexpected error occurred. Please try again.');
     } finally {
       isUpdatingAttendance.value = false;
     }
@@ -344,25 +486,61 @@ class AttendanceUIController extends GetxController {
     DateTime date,
     List<EmployeeAttendance> employeeAttendances,
   ) async {
+    // Validation
+    if (employeeAttendances.isEmpty) {
+      _showErrorMessage('No attendance data to mark');
+      return;
+    }
+
+    // Validate each attendance entry
+    for (var attendance in employeeAttendances) {
+      if (attendance.employeeId.isEmpty) {
+        _showErrorMessage('Invalid employee data found');
+        return;
+      }
+      if (![0, 1, 2, 3].contains(attendance.status)) {
+        _showErrorMessage(
+            'Invalid attendance status found: ${attendance.status}');
+        return;
+      }
+    }
+
     if (_checkWagesPaidRestriction()) return;
     if (isUpdatingAttendance.value) return;
 
     isUpdatingAttendance.value = true;
 
     try {
+      print(
+          'Marking attendance for ${employeeAttendances.length} employees on $date');
+
       final response = await AttendanceService.markAttendance(
         date: date,
         employeeAttendances: employeeAttendances,
       );
 
-      if (response['success'] == true) {
+      if (response != null && response['success'] == true) {
+        // Update local state for all employees
+        for (var attendance in employeeAttendances) {
+          _updateLocalAttendance(
+              attendance.employeeId, date, attendance.status);
+        }
+
         await fetchWeeklyData();
         _showSuccessMessage(
-            response['data']['message'] ?? 'Attendance marked successfully');
+            response['data']?['message'] ?? 'Attendance marked successfully');
       } else {
-        _handleApiError(response);
+        if (response == null) {
+          throw Exception('No response received from server');
+        } else {
+          final errorMessage = response['data']?['message'] ??
+              response['error'] ??
+              'Failed to mark attendance';
+          throw Exception(errorMessage);
+        }
       }
     } catch (e) {
+      print('Error in markAttendanceForDate: $e');
       _handleException('Failed to mark attendance', e);
     } finally {
       isUpdatingAttendance.value = false;
@@ -399,6 +577,50 @@ class AttendanceUIController extends GetxController {
     }
   }
 
+  // Add a method to check attendance service health
+  Future<bool> checkServiceHealth() async {
+    try {
+      // You can add a health check endpoint call here
+      // For now, we'll just return true
+      return true;
+    } catch (e) {
+      print('Service health check failed: $e');
+      return false;
+    }
+  }
+
+// Enhanced validation method for attendance data
+  bool validateAttendanceData(String employeeId, DateTime date, int status) {
+    // Check employee exists
+    final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
+    if (employee == null) {
+      _showErrorMessage('Employee not found: $employeeId');
+      return false;
+    }
+
+    // Check date is valid
+    if (date.isAfter(DateTime.now())) {
+      _showErrorMessage('Cannot mark attendance for future dates');
+      return false;
+    }
+
+    // Check status is valid
+    if (![0, 1, 2, 3].contains(status)) {
+      _showErrorMessage('Invalid attendance status: $status');
+      return false;
+    }
+
+    // Check if date is within reasonable range
+    final today = DateTime.now();
+    final sixMonthsAgo = today.subtract(const Duration(days: 180));
+    if (date.isBefore(sixMonthsAgo)) {
+      _showErrorMessage('Cannot mark attendance for dates older than 6 months');
+      return false;
+    }
+
+    return true;
+  }
+
   /// Get attendance for a specific date
   Future<void> getAttendanceForDate(DateTime date) async {
     try {
@@ -430,13 +652,6 @@ class AttendanceUIController extends GetxController {
   }) async {
     if (isProcessingPayment.value) return;
 
-    print('PAYMENT DEBUG - Starting payment process');
-    print('Employee ID: $employeeId');
-    print('Amount: $amount');
-    print('Current payment status: ${employeePaymentStatus[employeeId]}');
-    print('Current partial payment: ${employeePartialPayments[employeeId]}');
-    print('Current remaining: ${employeeRemainingAmounts[employeeId]}');
-
     isProcessingPayment.value = true;
 
     try {
@@ -450,81 +665,41 @@ class AttendanceUIController extends GetxController {
         payAll: false,
       );
 
-      print('Sending API request...');
+      print('Sending payment request: ${request.toJson()}');
       final response = await AttendanceService.payWages(request: request);
 
-      print('API Response received:');
-      print('Success: ${response['success']}');
-      print('Response data: ${response['data']}');
+      print('Payment API Response: $response');
 
       if (response['success'] == true) {
-        print('API call successful, refreshing data...');
+        print('Payment successful, processing response...');
 
-        // Store old values for comparison
-        final oldStatus = employeePaymentStatus[employeeId] ?? 'pending';
-        final oldPartial = employeePartialPayments[employeeId] ?? 0.0;
-        final oldRemaining = employeeRemainingAmounts[employeeId] ?? 0.0;
+        // CRITICAL FIX: Extract and process payment data from response
+        final responseData = response['data'];
+        if (responseData != null) {
+          // Update local state immediately with response data
+          _updatePaymentStatusFromResponse(employeeId, responseData);
 
-        print('Before fetchWeeklyData:');
-        print('  Status: $oldStatus');
-        print('  Partial: $oldPartial');
-        print('  Remaining: $oldRemaining');
+          // Force UI refresh
+          _refreshPaymentUI();
+        }
 
-        // Refresh data from backend
+        // Then fetch fresh data from backend to ensure consistency
+        await Future.delayed(const Duration(
+            milliseconds: 500)); // Small delay to ensure DB is updated
         await fetchWeeklyData();
 
-        print('After fetchWeeklyData:');
+        // Get employee name for success message
+        final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
+        final employeeName = employee?.name ?? 'Employee';
+
+        print('Payment processed successfully:');
         print('  Status: ${employeePaymentStatus[employeeId]}');
         print('  Partial: ${employeePartialPayments[employeeId]}');
         print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
 
-        // Check if values actually changed
-        final newStatus = employeePaymentStatus[employeeId] ?? 'pending';
-        final newPartial = employeePartialPayments[employeeId] ?? 0.0;
-        final newRemaining = employeeRemainingAmounts[employeeId] ?? 0.0;
-
-        if (newStatus == oldStatus &&
-            newPartial == oldPartial &&
-            newRemaining == oldRemaining) {
-          print(
-              'WARNING: Payment values did not change after fetchWeeklyData!');
-          print(
-              'This indicates the backend is not returning updated payment data.');
-
-          // Manual update as fallback
-          print('Manually updating local state...');
-          final totalWages = getTotalWages(employeeId);
-          final newTotalPaid = oldPartial + amount;
-
-          employeePartialPayments[employeeId] = newTotalPaid;
-
-          if (newTotalPaid >= totalWages) {
-            employeePaymentStatus[employeeId] = 'paid';
-            employeeRemainingAmounts[employeeId] = 0.0;
-          } else {
-            employeePaymentStatus[employeeId] = 'partial';
-            employeeRemainingAmounts[employeeId] = totalWages - newTotalPaid;
-          }
-
-          // Force UI refresh
-          employeePaymentStatus.refresh();
-          employeePartialPayments.refresh();
-          employeeRemainingAmounts.refresh();
-
-          print('Manual update complete:');
-          print('  Status: ${employeePaymentStatus[employeeId]}');
-          print('  Partial: ${employeePartialPayments[employeeId]}');
-          print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
-        } else {
-          print('Payment values updated correctly from backend');
-        }
-
-        final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
-        final employeeName = employee?.name ?? 'Employee';
-
         _showPaymentSuccessDialog(employeeName, amount);
       } else {
-        print('API call failed: ${response}');
+        print('Payment API failed: $response');
         _handleApiError(response);
       }
     } catch (e) {
@@ -533,6 +708,309 @@ class AttendanceUIController extends GetxController {
     } finally {
       isProcessingPayment.value = false;
     }
+  }
+
+  void _updatePaymentStatusFromResponse(
+      String employeeId, Map<String, dynamic> responseData) {
+    try {
+      // Extract payment information from response
+      if (responseData.containsKey('payment_status')) {
+        employeePaymentStatus[employeeId] = responseData['payment_status'];
+      }
+
+      if (responseData.containsKey('partial_payment')) {
+        employeePartialPayments[employeeId] =
+            double.tryParse(responseData['partial_payment'].toString()) ?? 0.0;
+      }
+
+      if (responseData.containsKey('remaining_amount')) {
+        employeeRemainingAmounts[employeeId] =
+            double.tryParse(responseData['remaining_amount'].toString()) ?? 0.0;
+      }
+
+      // Alternative: If response contains employee data directly
+      if (responseData.containsKey('employee')) {
+        final empData = responseData['employee'];
+        employeePaymentStatus[employeeId] =
+            empData['payment_status'] ?? 'pending';
+        employeePartialPayments[employeeId] =
+            double.tryParse(empData['partial_payment'].toString()) ?? 0.0;
+        employeeRemainingAmounts[employeeId] =
+            double.tryParse(empData['remaining_amount'].toString()) ?? 0.0;
+      }
+
+      print('Updated payment status from response:');
+      print('  Employee: $employeeId');
+      print('  Status: ${employeePaymentStatus[employeeId]}');
+      print('  Partial Payment: ${employeePartialPayments[employeeId]}');
+      print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
+    } catch (e) {
+      print('Error updating payment status from response: $e');
+    }
+  }
+
+  bool _validateBulkPaymentConditions() {
+    // Check if there are any employees
+    if (employees.isEmpty) {
+      _showErrorMessage('No employees found for the selected week');
+      return false;
+    }
+
+    // Check if wages are already paid
+    if (wagesPaid.value) {
+      _showErrorMessage('All wages have already been paid for this week');
+      return false;
+    }
+
+    // Check if there are any unpaid amounts
+    double totalUnpaid = getTotalRemainingAmount();
+    if (totalUnpaid <= 0) {
+      _showErrorMessage('No pending payments found for this week');
+      return false;
+    }
+
+    // Check if total wages is reasonable
+    if (grandTotalWages.value <= 0) {
+      _showErrorMessage(
+          'Total wages amount is invalid: ₹${grandTotalWages.value}');
+      return false;
+    }
+
+    print(
+        'Validation passed: ₹$totalUnpaid pending for ${employees.length} employees');
+    return true;
+  }
+
+  /// NEW METHOD: Force refresh payment UI
+  void _refreshPaymentUI() {
+    // Force refresh of all observable maps
+    employeePaymentStatus.refresh();
+    employeePartialPayments.refresh();
+    employeeRemainingAmounts.refresh();
+
+    // Recalculate grand total wages and payment status
+    _recalculateWageSummary();
+
+    // Force rebuild of employees list
+    employees.refresh();
+  }
+
+  /// NEW METHOD: Recalculate wage summary
+  void _recalculateWageSummary() {
+    double totalPaid = 0.0;
+    bool allPaid = true;
+
+    for (var employee in employees) {
+      final paidAmount = getPartialPayment(employee.id);
+      final remainingAmount = getRemainingAmount(employee.id);
+
+      totalPaid += paidAmount;
+
+      if (remainingAmount > 0) {
+        allPaid = false;
+      }
+    }
+
+    // Update wages paid status
+    wagesPaid.value = allPaid && employees.isNotEmpty;
+
+    print('Recalculated wage summary:');
+    print('  Total Paid: $totalPaid');
+    print('  All Paid: $allPaid');
+    print('  Grand Total: ${grandTotalWages.value}');
+  }
+
+  Future<void> payAllWages({
+    String paymentMode = 'Cash',
+    String? paymentReference,
+    String? remarks,
+  }) async {
+    if (isProcessingPayment.value) return;
+
+    // Pre-validation before API call
+    if (!_validateBulkPaymentConditions()) {
+      return;
+    }
+
+    isProcessingPayment.value = true;
+
+    try {
+      print('=== PAY ALL WAGES VALIDATION ===');
+      print('Total employees: ${employees.length}');
+      print('Grand total wages: ${grandTotalWages.value}');
+      print('Currently wages paid status: ${wagesPaid.value}');
+      print('Week start: ${selectedWeekStart.value.toDateString()}');
+
+      // Debug current payment status
+      _debugCurrentPaymentStatus();
+
+      final request = WagePaymentRequest(
+        employeeId: null,
+        amount: 0.0,
+        paymentMode: paymentMode,
+        paymentReference: paymentReference,
+        remarks: remarks ??
+            'Bulk wage payment for week ${selectedWeekStart.value.toDateString()}',
+        weekStart: selectedWeekStart.value.toDateString(),
+        payAll: true,
+      );
+
+      print('Sending bulk payment request: ${request.toJson()}');
+
+      final response = await AttendanceService.payWages(request: request);
+
+      print('Bulk payment API response: $response');
+
+      if (response['success'] == true) {
+        print('Bulk payment successful, refreshing data...');
+        await _handleSuccessfulBulkPayment(response['data']);
+      } else {
+        print('Bulk payment failed: ${response}');
+        await _handleBulkPaymentError(response);
+      }
+    } catch (e) {
+      print('Bulk payment exception: $e');
+      _handleException('Failed to process bulk payment', e);
+    } finally {
+      isProcessingPayment.value = false;
+    }
+  }
+
+  void _debugCurrentPaymentStatus() {
+    print('=== PAYMENT STATUS DEBUG ===');
+    for (var employee in employees) {
+      final status = getPaymentStatus(employee.id);
+      final partial = getPartialPayment(employee.id);
+      final remaining = getRemainingAmount(employee.id);
+      final totalWages = getTotalWages(employee.id);
+
+      print('Employee: ${employee.name}');
+      print('  Status: $status');
+      print('  Total Wages: ₹$totalWages');
+      print('  Partial Payment: ₹$partial');
+      print('  Remaining: ₹$remaining');
+      print('  Has Wage: ${employee.hasWage}');
+      print('---');
+    }
+
+    print('Total employees: ${employees.length}');
+    print('Grand total wages: ₹${grandTotalWages.value}');
+    print('Total paid: ₹${getTotalPaidAmount()}');
+    print('Total remaining: ₹${getTotalRemainingAmount()}');
+    print('Wages paid status: ${wagesPaid.value}');
+  }
+
+// 4. Enhanced error handling for bulk payment failures
+  Future<void> _handleBulkPaymentError(Map<String, dynamic> response) async {
+    final statusCode = response['statusCode'];
+    final errorData = response['data'] ?? {};
+    String errorMessage =
+        errorData['error'] ?? errorData['message'] ?? 'Unknown error';
+
+    switch (statusCode) {
+      case 400:
+        if (errorMessage.contains('No pending payments')) {
+          // This is the specific error you're getting
+          await _handleNoPendingPaymentsError();
+        } else {
+          _showErrorMessage('Invalid request: $errorMessage');
+        }
+        break;
+      case 404:
+        _showErrorMessage('Week data not found. Please refresh and try again.');
+        await fetchWeeklyData(); // Auto-refresh
+        break;
+      case 500:
+        _showErrorMessage('Server error occurred. Please try again later.');
+        break;
+      default:
+        _handleApiError(response);
+    }
+  }
+
+// 5. Handle "No pending payments" error specifically
+  Future<void> _handleNoPendingPaymentsError() async {
+    print('Handling "No pending payments" error...');
+
+    // Force refresh data to sync with backend
+    await fetchWeeklyData();
+
+    // Check again after refresh
+    if (getTotalRemainingAmount() > 0) {
+      // If we still have pending amounts locally, there's a data sync issue
+      Get.dialog(
+        AlertDialog(
+          title: const Text('Data Synchronization Issue'),
+          content: const Text(
+              'There seems to be a mismatch between local and server data. '
+              'The data has been refreshed. Please try the payment again.'),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // All payments are actually completed
+      Get.dialog(
+        AlertDialog(
+          title: const Text('All Payments Complete'),
+          content: const Text('All wages for this week have already been paid. '
+              'The payment status has been updated.'),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+// 6. Enhanced successful bulk payment handler
+  Future<void> _handleSuccessfulBulkPayment(
+      Map<String, dynamic>? responseData) async {
+    // Refresh data from backend
+    await fetchWeeklyData();
+
+    // Show success dialog with details
+    if (responseData != null) {
+      _showBulkPaymentSuccessDialog(responseData);
+    } else {
+      _showSuccessMessage('All wages paid successfully!');
+    }
+  }
+
+// Add success dialog for bulk payments
+  void _showBulkPaymentSuccessDialog(Map<String, dynamic> responseData) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Bulk Payment Successful'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('All pending wages have been paid successfully!'),
+            const SizedBox(height: 12),
+            Text(
+                'Total Amount Paid: ₹${responseData['total_amount_paid'] ?? 0}'),
+            Text('Total Employees: ${responseData['total_employees'] ?? 0}'),
+            Text('Week: ${responseData['week_start_date'] ?? ''}'),
+            if (responseData['payment_mode'] != null)
+              Text('Payment Mode: ${responseData['payment_mode']}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Force refresh of weekly data - useful when you know employees were added
@@ -564,39 +1042,254 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Pay all wages for the week
-  Future<void> payAllWages({
-    String paymentMode = 'Cash',
-    String? paymentReference,
-    String? remarks,
-  }) async {
-    if (isProcessingPayment.value) return;
+  /// Generate weekly wage PDF
+  Future<void> generateWeeklyWagePdf() async {
+    if (isPdfGenerating.value) return;
 
-    isProcessingPayment.value = true;
+    isPdfGenerating.value = true;
 
     try {
-      final request = WagePaymentRequest(
-        amount: 0, // Not used for pay all
-        weekStart: selectedWeekStart.value.toDateString(),
-        payAll: true,
-        paymentMode: paymentMode,
-        paymentReference: paymentReference,
-        remarks: remarks,
+      print('Starting PDF generation for week: ${selectedWeekStart.value}');
+
+      // Check and request storage permissions
+      if (!await _checkStoragePermissions()) {
+        _showErrorMessage('Storage permission is required to save PDF files');
+        return;
+      }
+
+      final response = await AttendanceService.generateWeeklyWagePdf(
+        weekStart: selectedWeekStart.value,
       );
 
-      final response = await AttendanceService.payWages(request: request);
-
       if (response['success'] == true) {
-        await fetchWeeklyData();
-        _showPayAllSuccessDialog();
+        final pdfData = response['data'];
+
+        if (pdfData != null && pdfData.isNotEmpty) {
+          await _savePdfFile(pdfData, selectedWeekStart.value);
+        } else {
+          _showErrorMessage('No PDF data received from server');
+        }
       } else {
         _handleApiError(response);
       }
     } catch (e) {
-      _handleException('Failed to pay all wages', e);
+      _handleException('Failed to generate PDF', e);
     } finally {
-      isProcessingPayment.value = false;
+      isPdfGenerating.value = false;
     }
+  }
+
+  /// Check and request storage permissions
+  Future<bool> _checkStoragePermissions() async {
+    // For Android 11+ (API 30+), we don't need WRITE_EXTERNAL_STORAGE
+    // But for older versions, we might need it
+    if (Platform.isAndroid) {
+      final status = await Permission.storage.status;
+
+      if (status.isDenied) {
+        final result = await Permission.storage.request();
+        return result.isGranted;
+      }
+
+      return status.isGranted;
+    }
+
+    // For iOS, no special permissions needed for Documents directory
+    return true;
+  }
+
+  /// Save PDF file to device storage
+  Future<void> _savePdfFile(List<int> pdfBytes, DateTime weekStart) async {
+    try {
+      final fileName =
+          'weekly_wages_${DateFormat('yyyy_MM_dd').format(weekStart)}.pdf';
+
+      Directory? directory;
+
+      if (Platform.isAndroid) {
+        // Try to save to Downloads directory
+        directory = Directory('/storage/emulated/0/Download');
+
+        // If Downloads directory is not accessible, use app's documents directory
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+          directory ??= await getApplicationDocumentsDirectory();
+        }
+      } else if (Platform.isIOS) {
+        // For iOS, use app's documents directory
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        throw Exception('Could not access storage directory');
+      }
+
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+
+      print('PDF saved to: ${file.path}');
+
+      _showPdfSuccessDialog(file.path, fileName);
+    } catch (e) {
+      print('Error saving PDF: $e');
+      _handleException('Failed to save PDF file', e);
+    }
+  }
+
+  /// Show PDF generation success dialog
+  void _showPdfSuccessDialog(String filePath, String fileName) {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
+            const SizedBox(width: 8),
+            const Text('PDF Generated'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Weekly wage PDF has been generated successfully!'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.insert_drive_file, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      fileName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Saved to: ${Platform.isAndroid ? "Downloads" : "Documents"}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Get.back();
+              await _openPdfFile(filePath);
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Open PDF'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open PDF file with default application
+  Future<void> _openPdfFile(String filePath) async {
+    try {
+      final result = await OpenFile.open(filePath);
+
+      if (result.type != ResultType.done) {
+        // If default PDF viewer is not available, show options
+        Get.dialog(
+          AlertDialog(
+            title: const Text('Cannot Open PDF'),
+            content: const Text(
+              'No PDF viewer app found. Please install a PDF reader app from the Play Store or App Store to view the generated PDF.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error opening PDF: $e');
+      _showErrorMessage(
+          'Could not open PDF file. Please check if you have a PDF viewer installed.');
+    }
+  }
+
+  /// Generate and share PDF via sharing options
+  Future<void> generateAndSharePdf() async {
+    if (isPdfGenerating.value) return;
+
+    isPdfGenerating.value = true;
+
+    try {
+      final response = await AttendanceService.generateWeeklyWagePdf(
+        weekStart: selectedWeekStart.value,
+      );
+
+      if (response['success'] == true) {
+        final pdfData = response['data'];
+
+        if (pdfData != null && pdfData.isNotEmpty) {
+          await _sharePdfFile(pdfData, selectedWeekStart.value);
+        } else {
+          _showErrorMessage('No PDF data received from server');
+        }
+      } else {
+        _handleApiError(response);
+      }
+    } catch (e) {
+      _handleException('Failed to generate and share PDF', e);
+    } finally {
+      isPdfGenerating.value = false;
+    }
+  }
+
+  /// Share PDF file using system sharing
+  Future<void> _sharePdfFile(List<int> pdfBytes, DateTime weekStart) async {
+    try {
+      final fileName =
+          'weekly_wages_${DateFormat('yyyy_MM_dd').format(weekStart)}.pdf';
+
+      // Get temporary directory for sharing
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+
+      _showSuccessMessage(
+          'PDF generated successfully. File saved to temporary storage.');
+    } catch (e) {
+      print('Error sharing PDF: $e');
+      _handleException('Failed to share PDF file', e);
+    }
+  }
+
+  /// Show error message
+  void _showErrorMessage(String message) {
+    Get.snackbar(
+      'Error',
+      message,
+      backgroundColor: Colors.red.shade100,
+      colorText: Colors.red.shade800,
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 4),
+    );
   }
 
   /// Get wage summary for current week
@@ -771,10 +1464,34 @@ class AttendanceUIController extends GetxController {
 
   /// Update local attendance record
   void _updateLocalAttendance(String employeeId, DateTime date, int status) {
-    if (attendanceRecords[employeeId] == null) {
-      attendanceRecords[employeeId] = {};
+    try {
+      // Validate inputs
+      if (employeeId.isEmpty) {
+        print('Warning: Empty employee ID in _updateLocalAttendance');
+        return;
+      }
+
+      if (![0, 1, 2, 3].contains(status)) {
+        print('Warning: Invalid status $status in _updateLocalAttendance');
+        return;
+      }
+
+      // Ensure attendance record exists
+      if (attendanceRecords[employeeId] == null) {
+        attendanceRecords[employeeId] = {};
+      }
+
+      // Update the record
+      attendanceRecords[employeeId]![date] = status;
+
+      // Force observable update
+      attendanceRecords.refresh();
+
+      print(
+          'Local attendance updated: Employee $employeeId, Date $date, Status $status');
+    } catch (e) {
+      print('Error in _updateLocalAttendance: $e');
     }
-    attendanceRecords[employeeId]![date] = status;
   }
 
   /// Apply employee ordering
@@ -947,14 +1664,28 @@ class AttendanceUIController extends GetxController {
 
   /// Handle API errors
   void _handleApiError(Map<String, dynamic> response) {
-    final message = response['data']?['message'] ?? 'An error occurred';
-    Get.snackbar(
-      'Error',
-      message,
-      backgroundColor: Colors.red.shade100,
-      colorText: Colors.red.shade800,
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    print('API Error Response: $response');
+
+    String message = 'An error occurred';
+
+    // Try to extract error message from various possible locations
+    if (response['data'] != null && response['data']['message'] != null) {
+      message = response['data']['message'];
+    } else if (response['error'] != null) {
+      message = response['error'];
+    } else if (response['message'] != null) {
+      message = response['message'];
+    } else if (response['errors'] != null) {
+      // Handle validation errors
+      if (response['errors'] is Map) {
+        final errors = response['errors'] as Map;
+        message = errors.values.join(', ');
+      } else if (response['errors'] is List) {
+        message = (response['errors'] as List).join(', ');
+      }
+    }
+
+    _showErrorMessage(message);
   }
 
   /// Handle exceptions

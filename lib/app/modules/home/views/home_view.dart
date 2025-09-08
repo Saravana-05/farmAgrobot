@@ -84,7 +84,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.person_add_alt,
                       title: 'Merchants',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToMerchant),
                     ),
                     SmallCard(
                       icon: Icons.work,

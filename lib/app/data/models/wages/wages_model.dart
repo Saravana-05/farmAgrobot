@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 class Wage {
   final String id;
-  final String employeeId;
-  final String employeeName; 
+  final dynamic employeeId;
+  final String employeeName;
   final DateTime effectiveFrom;
   final DateTime? effectiveTo;
   final double amount;
@@ -27,45 +27,49 @@ class Wage {
   factory Wage.fromJson(Map<String, dynamic> json) {
     return Wage(
       id: json['id']?.toString() ?? '',
-      employeeId: json['employee_id']?.toString() ?? json['employee']?.toString() ?? '',
+      employeeId: json['employee_id'] ?? json['employee'] ?? '',
       employeeName: json['employee_name'] ?? '',
-      effectiveFrom: json['effective_from'] != null 
-          ? DateTime.parse(json['effective_from']) 
+      effectiveFrom: json['effective_from'] != null
+          ? DateTime.parse(json['effective_from'])
           : DateTime.now(),
-      effectiveTo: json['effective_to'] != null 
-          ? DateTime.parse(json['effective_to']) 
+      effectiveTo: json['effective_to'] != null
+          ? DateTime.parse(json['effective_to'])
           : null,
       amount: _parseAmount(json['amount']),
       remarks: json['remarks'],
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
           : null,
     );
   }
 
-  /// Helper method to parse amount from various formats
-  static double _parseAmount(dynamic amount) {
-    if (amount == null) return 0.0;
-    
-    if (amount is double) {
-      return amount;
-    } else if (amount is int) {
-      return amount.toDouble();
-    } else if (amount is String) {
-      return double.tryParse(amount) ?? 0.0;
-    }
-    
-    return 0.0;
+  // Helper method to safely parse amount from different types
+static dynamic _parseAmount(dynamic amount) {
+  if (amount == null) return 0.0;
+  
+  if (amount is int) {
+    return amount.toDouble();
+  } else if (amount is double) {
+    return amount;
+  } else if (amount is String) {
+    return double.tryParse(amount) ?? 0.0;
+  } else if (amount is num) {
+    return amount.toDouble();
+  } else {
+    // Fallback: try to parse as string
+    return double.tryParse(amount.toString()) ?? 0.0;
   }
+}
 
   /// Convert Wage to JSON (for API requests)
   Map<String, dynamic> toJson() {
     return {
       'employee_id': employeeId,
-      'effective_from': effectiveFrom.toIso8601String().split('T')[0], // YYYY-MM-DD format
+      'effective_from':
+          effectiveFrom.toIso8601String().split('T')[0], // YYYY-MM-DD format
       'effective_to': effectiveTo?.toIso8601String().split('T')[0],
       'amount': amount,
       'remarks': remarks,
@@ -110,16 +114,16 @@ class Wage {
   /// Get formatted effective from date
   String get formattedEffectiveFrom {
     return '${effectiveFrom.day.toString().padLeft(2, '0')}/'
-           '${effectiveFrom.month.toString().padLeft(2, '0')}/'
-           '${effectiveFrom.year}';
+        '${effectiveFrom.month.toString().padLeft(2, '0')}/'
+        '${effectiveFrom.year}';
   }
 
   /// Get formatted effective to date
   String get formattedEffectiveTo {
     if (effectiveTo == null) return 'Ongoing';
     return '${effectiveTo!.day.toString().padLeft(2, '0')}/'
-           '${effectiveTo!.month.toString().padLeft(2, '0')}/'
-           '${effectiveTo!.year}';
+        '${effectiveTo!.month.toString().padLeft(2, '0')}/'
+        '${effectiveTo!.year}';
   }
 
   /// Get formatted date range
@@ -147,25 +151,31 @@ class Wage {
   bool get isCurrent {
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final effectiveFromDate = DateTime(effectiveFrom.year, effectiveFrom.month, effectiveFrom.day);
-    
+    final effectiveFromDate =
+        DateTime(effectiveFrom.year, effectiveFrom.month, effectiveFrom.day);
+
     if (effectiveTo != null) {
-      final effectiveToDate = DateTime(effectiveTo!.year, effectiveTo!.month, effectiveTo!.day);
-      return effectiveFromDate.isBefore(todayDate) || effectiveFromDate.isAtSameMomentAs(todayDate) &&
-             effectiveToDate.isAfter(todayDate) || effectiveToDate.isAtSameMomentAs(todayDate);
+      final effectiveToDate =
+          DateTime(effectiveTo!.year, effectiveTo!.month, effectiveTo!.day);
+      return effectiveFromDate.isBefore(todayDate) ||
+          effectiveFromDate.isAtSameMomentAs(todayDate) &&
+              effectiveToDate.isAfter(todayDate) ||
+          effectiveToDate.isAtSameMomentAs(todayDate);
     } else {
-      return effectiveFromDate.isBefore(todayDate) || effectiveFromDate.isAtSameMomentAs(todayDate);
+      return effectiveFromDate.isBefore(todayDate) ||
+          effectiveFromDate.isAtSameMomentAs(todayDate);
     }
   }
 
   /// Check if this wage record is expired
   bool get isExpired {
     if (effectiveTo == null) return false;
-    
+
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final effectiveToDate = DateTime(effectiveTo!.year, effectiveTo!.month, effectiveTo!.day);
-    
+    final effectiveToDate =
+        DateTime(effectiveTo!.year, effectiveTo!.month, effectiveTo!.day);
+
     return effectiveToDate.isBefore(todayDate);
   }
 
@@ -173,8 +183,9 @@ class Wage {
   bool get isUpcoming {
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final effectiveFromDate = DateTime(effectiveFrom.year, effectiveFrom.month, effectiveFrom.day);
-    
+    final effectiveFromDate =
+        DateTime(effectiveFrom.year, effectiveFrom.month, effectiveFrom.day);
+
     return effectiveFromDate.isAfter(todayDate);
   }
 
@@ -215,19 +226,19 @@ class Wage {
   /// Validate wage data
   List<String> validate() {
     final errors = <String>[];
-    
+
     if (employeeId.isEmpty) {
       errors.add('Employee ID is required');
     }
-    
+
     if (amount <= 0) {
       errors.add('Amount must be greater than 0');
     }
-    
+
     if (effectiveTo != null && effectiveTo!.isBefore(effectiveFrom)) {
       errors.add('Effective to date must be after effective from date');
     }
-    
+
     return errors;
   }
 
@@ -246,7 +257,7 @@ class Wage {
   String get durationText {
     final days = durationInDays;
     if (days == null) return 'Ongoing';
-    
+
     if (days == 1) return '1 day';
     if (days < 30) return '$days days';
     if (days < 365) {
@@ -266,9 +277,7 @@ class Wage {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Wage &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      other is Wage && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
