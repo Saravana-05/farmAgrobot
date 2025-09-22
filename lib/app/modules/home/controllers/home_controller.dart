@@ -1,14 +1,14 @@
-
-import 'package:farm_agrobot/app/data/models/merchant/merchant_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../../attendance/views/attendance.dart';
+import '../../dashboard/view/dashboard_view.dart';
 import '../../employees/views/employee_screen.dart';
 import '../../expenses/views/expense_screen.dart';
+import '../../farm_segments/views/farm_seg_screen.dart';
 import '../../merchants/views/merchant_screen.dart';
+import '../../sales/views/sales_screen.dart';
 import '../../wages/views/wages_screen.dart';
-import '../views/home_view.dart';
+import '../../yield/views/yield_screen.dart';
 
 class HomeController extends GetxController {
   // Observable variables
@@ -22,7 +22,7 @@ class HomeController extends GetxController {
   // Methods
   void onTabSelected(int index) {
     _selectedIndex.value = index;
-    
+
     // Handle navigation
     switch (index) {
       case 0:
@@ -64,7 +64,7 @@ class HomeController extends GetxController {
   }
 
   void navigateToDashboard() {
-    Get.to(() => const HomeView());
+    Get.to(() => DashboardScreen());
   }
 
   void navigateToExpenses() {
@@ -78,9 +78,11 @@ class HomeController extends GetxController {
   void navigateToWages() {
     Get.to(() => WagesScreen());
   }
+
   void navigateToAttendance() {
     Get.to(() => AttendanceScreen());
   }
+
   void navigateToMerchant() {
     Get.to(() => MerchantScreen());
   }
@@ -89,9 +91,9 @@ class HomeController extends GetxController {
   //   Get.to(() => EmployeeScreen());
   // }
 
-  // void navigateToFarm() {
-  //   Get.to(() => FarmScreen());
-  // }
+  void navigateToFarm() {
+    Get.to(() => FarmSegScreen());
+  }
 
   // void navigateToMerchants() {
   //   Get.to(() => MerchantsScreen());
@@ -101,9 +103,13 @@ class HomeController extends GetxController {
   //   Get.to(() => JobScreen());
   // }
 
-  // void navigateToYield() {
-  //   Get.to(() => YieldScreen());
-  // }
+  void navigateToYield() {
+    Get.to(() => YieldScreen());
+  }
+
+  void navigateToSales() {
+    Get.to(() => SalesScreen());
+  }
 
   // void navigateToExpenses() {
   //   Get.to(() => ExpensesScreen());

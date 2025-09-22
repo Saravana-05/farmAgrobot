@@ -7,6 +7,45 @@ import '../../../config/api.dart';
 import '../../models/employee/emp_model.dart';
 
 class EmployeeService {
+  /// Common response handler with better logging
+  static Map<String, dynamic> handleResponse(http.Response response) {
+    print("➡️ API Response [${response.statusCode}] ${response.request?.url}");
+    print("Body: ${response.body}");
+
+    try {
+      final decoded = json.decode(response.body);
+      return {
+        'success': response.statusCode >= 200 && response.statusCode < 300,
+        'statusCode': response.statusCode,
+        'data': decoded,
+      };
+    } on FormatException catch (e) {
+      print("❌ JSON decode error: $e");
+      return {
+        'success': false,
+        'statusCode': response.statusCode,
+        'data': {
+          'status': 'error',
+          'message': 'Invalid JSON response from server',
+          'raw': response.body,
+        },
+      };
+    }
+  }
+
+  /// Common error handler
+  static Map<String, dynamic> handleError(dynamic e, [String action = ""]) {
+    print("❌ Error in $action: $e");
+    return {
+      'success': false,
+      'statusCode': 500,
+      'data': {
+        'status': 'error',
+        'message': 'Unexpected error: ${e.toString()}',
+      },
+    };
+  }
+
   /// Save employee data with optional image upload
   static Future<Map<String, dynamic>> saveEmployee({
     required Map<String, dynamic> employeeData,
@@ -77,14 +116,15 @@ class EmployeeService {
     }
   }
 
-  /// Get list of employees with filtering and pagination
+  /// Get list of employees
   static Future<Map<String, dynamic>> getEmployeeList({
     int page = 1,
     int limit = 10,
     String? search,
     String? empType,
     String? gender,
-    bool? isActive,  bool? active,
+    bool? isActive,
+    bool? active,
   }) async {
     try {
       final Map<String, String> queryParams = {
@@ -92,44 +132,16 @@ class EmployeeService {
         'limit': limit.toString(),
       };
 
-      if (search != null && search.isNotEmpty) {
-        queryParams['search'] = search;
-      }
+      if (search?.isNotEmpty == true) queryParams['search'] = search!;
+      if (empType?.isNotEmpty == true) queryParams['emp_type'] = empType!;
+      if (gender?.isNotEmpty == true) queryParams['gender'] = gender!;
+      if (isActive != null) queryParams['is_active'] = isActive.toString();
 
-      if (empType != null && empType.isNotEmpty) {
-        queryParams['emp_type'] = empType;
-      }
-
-      if (gender != null && gender.isNotEmpty) {
-        queryParams['gender'] = gender;
-      }
-
-      if (isActive != null) {
-        queryParams['is_active'] = isActive.toString();
-      }
-
-      final uri = Uri.parse(viewEmployee).replace(
-        queryParameters: queryParams,
-      );
-
-      final response = await http.get(
-        uri,
-      );
-
-      return {
-        'success': response.statusCode == 200,
-        'statusCode': response.statusCode,
-        'data': json.decode(response.body),
-      };
+      final uri = Uri.parse(viewEmployee).replace(queryParameters: queryParams);
+      final response = await http.get(uri);
+      return handleResponse(response);
     } catch (e) {
-      return {
-        'success': false,
-        'statusCode': 500,
-        'data': {
-          'status': 'error',
-          'message': 'Network error: ${e.toString()}'
-        },
-      };
+      return handleError(e, "getEmployeeList");
     }
   }
 

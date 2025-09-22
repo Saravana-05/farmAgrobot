@@ -7,11 +7,15 @@ import 'app/global_widgets/card_grid/controller/card_controller.dart';
 import 'app/modules/attendance/controller/attendance_controller.dart';
 import 'app/modules/crop_variants/controller/crop_variant_controller.dart';
 import 'app/modules/crops/controller/crop_controller.dart';
+import 'app/modules/dashboard/controller/dashboard_controller.dart';
 import 'app/modules/employees/controller/employee_controller.dart';
 import 'app/modules/expenses/controller/expense_controller.dart';
+import 'app/modules/farm_segments/controller/farm_seg_controller.dart';
 import 'app/modules/merchants/controller/merchant_controller.dart';
+import 'app/modules/sales/controller/sales_controller.dart';
 import 'app/modules/settings/controller/settings_controller.dart';
 import 'app/modules/wages/controller/wages_controller.dart';
+import 'app/modules/yield/controller/yield_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app_binding.dart';
@@ -40,6 +44,11 @@ void main() async {
   Get.put(CropController());
   Get.put(CropVariantController());
   Get.put(MerchantController());
+  Get.put(FarmSegController());
+  Get.put(YieldController());
+  Get.put(SalesController());
+  Get.put(DashboardController());
+  
 
   runApp(MyApp());
 }

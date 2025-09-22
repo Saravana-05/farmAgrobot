@@ -78,7 +78,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.energy_savings_leaf,
                       title: 'Farm',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToFarm),
                     ),
                     SmallCard(
                       icon: Icons.person_add_alt,
@@ -96,7 +96,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.crop,
                       title: 'Crop & Yield',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToYield),
                     ),
                     SmallCard(
                       icon: Icons.money,
@@ -108,7 +108,7 @@ class HomeView extends GetView<HomeController> {
                       icon: Icons.sell,
                       title: 'Sales',
                       color: kTertiaryColor,
-                      onTap: (controller.navigateToDashboard),
+                      onTap: (controller.navigateToSales),
                     ),
                     SmallCard(
                       icon: Icons.account_balance_wallet,

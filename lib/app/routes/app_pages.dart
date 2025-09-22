@@ -10,6 +10,7 @@ import '../modules/crops/views/add_crop_screen.dart';
 import '../modules/crops/views/crop_edit_screen.dart';
 import '../modules/crops/views/crop_view.dart';
 import '../modules/crops/views/crops_screen.dart';
+import '../modules/dashboard/view/dashboard_view.dart';
 import '../modules/employees/views/add_employee.dart';
 import '../modules/employees/views/edit_employee_screen.dart';
 import '../modules/employees/views/employee_screen.dart';
@@ -20,12 +21,21 @@ import '../modules/expenses/views/add_expenses_screen.dart';
 import '../modules/expenses/views/edit_expense_view.dart';
 import '../modules/expenses/views/expense_screen.dart';
 import '../modules/expenses/views/expense_view.dart';
+import '../modules/farm_segments/views/add_farm_seg.dart';
+import '../modules/farm_segments/views/edit_farm_seg.dart';
+import '../modules/farm_segments/views/farm_seg_screen.dart';
+import '../modules/farm_segments/views/view_farm_seg.dart';
 import '../modules/home/binding/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/merchants/views/add_merchant.dart';
 import '../modules/merchants/views/edit_merchant.dart';
 import '../modules/merchants/views/merchant_screen.dart';
 import '../modules/merchants/views/view_merchant.dart';
+import '../modules/sales/bindings/sales_binding.dart';
+import '../modules/sales/controller/add_sales_controller.dart';
+import '../modules/sales/views/add_sales.dart';
+import '../modules/sales/views/sale_review_screen.dart';
+import '../modules/sales/views/sales_screen.dart';
 import '../modules/settings/views/settings_screen.dart';
 import '../modules/splash/views/splash_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
@@ -33,6 +43,9 @@ import '../modules/wages/views/add_wages.dart';
 import '../modules/wages/views/edit_wages.dart';
 import '../modules/wages/views/view_wages.dart';
 import '../modules/wages/views/wages_screen.dart';
+import '../modules/yield/views/add_yield.dart';
+import '../modules/yield/views/yield_edit.dart';
+import '../modules/yield/views/yield_screen.dart';
 
 part 'app_routes.dart';
 
@@ -51,6 +64,11 @@ class AppPages {
       name: _Paths.HOME,
       page: () => HomeView(),
       binding: HomeBinding(),
+    ),
+    GetPage(
+      name: _Paths.DASHBOARD,
+      page: () => DashboardScreen(),
+      // binding: HomeBinding(),
     ),
     GetPage(
       name: _Paths.EXPENSES,
@@ -156,7 +174,7 @@ class AppPages {
       page: () => CropVariantEditScreen(),
       // binding: EditExpenseBinding(),
     ),
-     GetPage(
+    GetPage(
       name: _Paths.MERCHANT,
       page: () => MerchantScreen(),
       // binding: EditExpenseBinding(),
@@ -177,6 +195,60 @@ class AppPages {
       // binding: EditExpenseBinding(),
     ),
     GetPage(
+      name: _Paths.FARM_SEGMENT,
+      page: () => FarmSegScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_FARM_SEGMENT,
+      page: () => AddFarmSegments(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_FARM_SEGMENT,
+      page: () => FarmSegmentEditScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.VIEW_FARM_SEGMENT,
+      page: () => ViewFarmSegments(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.YIELD,
+      page: () => YieldScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_YIELD,
+      page: () => AddYield(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.EDIT_YIELD,
+      page: () => YieldEditScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.SALES,
+      page: () => SalesScreen(),
+      binding: SalesBinding(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADD_SALES,
+      page: () => AddSale(),
+      binding: BindingsBuilder(() {
+        Get.put(AddSaleController());
+      }),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.SALES_REVIEW,
+      page: () => SaleReviewScreen(),
+      // binding: EditExpenseBinding(),
+    ),
+    GetPage(
       name: _Paths.SETTINGS,
       page: () => SettingsScreen(),
       // binding: EditExpenseBinding(),
@@ -188,6 +260,5 @@ class AppPages {
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),
-    
   ];
 }

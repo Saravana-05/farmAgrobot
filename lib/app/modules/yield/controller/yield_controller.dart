@@ -1,7 +1,7 @@
 import 'package:farm_agrobot/app/routes/app_pages.dart';
 import 'package:get/get.dart';
 
-class FarmSegController extends GetxController {
+class YieldController extends GetxController {
   // Observable variable for selected bottom navigation index
   final RxInt selectedIndex = 0.obs;
 
@@ -29,11 +29,13 @@ class FarmSegController extends GetxController {
   }
 
   // Method to handle add expense navigation
-  void navigateToAddFarmSegments() {
-    Get.toNamed(Routes.ADD_FARM_SEGMENT);
+  void navigateToAddYield() {
+    Get.toNamed(Routes.ADD_YIELD);
   }
 
    void navigateToViewCrops() {
     Get.toNamed(Routes.ADD_CROPS);
   }
 }
+
+

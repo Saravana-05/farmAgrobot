@@ -3,21 +3,20 @@ import 'package:get/get.dart';
 import '../../../global_widgets/bottom_navigation/bottom_navigation_widget.dart';
 import '../../../global_widgets/drawer/views/drawer.dart';
 import '../../../global_widgets/menu_app_bar/menu_app_bar.dart';
-import '../../crops/views/crop_view.dart';
-import '../controller/farm_seg_controller.dart' as farmSeg_controller;
-import 'view_farm_seg.dart';
+import '../controller/yield_controller.dart' as yield_controller;
+import 'yield_view.dart';
 
 
-class FarmSegScreen extends GetView<farmSeg_controller.FarmSegController> {
+class YieldScreen extends GetView<yield_controller.YieldController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: MenuAppBar(
         // isCustomScreen: false,
-        title: 'Farm Segments',
+        title: 'Yield',
         showAddIcon: true,
         onAddPressed: () {
-          controller.navigateToAddFarmSegments();
+          controller.navigateToAddYield();
         },
       ),
       extendBodyBehindAppBar: false,
@@ -25,7 +24,7 @@ class FarmSegScreen extends GetView<farmSeg_controller.FarmSegController> {
       body: Align(
         alignment: Alignment.topCenter,
         child: Stack(
-          children: [ViewFarmSegments()],
+          children: [ViewYields()],
         ),
       ),
       bottomNavigationBar: Obx(() => MyBottomNavigation(

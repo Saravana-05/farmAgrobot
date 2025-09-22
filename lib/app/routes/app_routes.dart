@@ -34,6 +34,21 @@ abstract class Routes {
   static const ADD_MERCHANT = _Paths.ADD_MERCHANT;
   static const VIEW_MERCHANT = _Paths.VIEW_MERCHANT;
   static const EDIT_MERCHANT = _Paths.EDIT_MERCHANT;
+  static const FARM_SEGMENT = _Paths.FARM_SEGMENT;
+  static const ADD_FARM_SEGMENT = _Paths.ADD_FARM_SEGMENT;
+  static const VIEW_FARM_SEGMENT = _Paths.VIEW_FARM_SEGMENT;
+  static const EDIT_FARM_SEGMENT = _Paths.EDIT_FARM_SEGMENT;
+  static const YIELD = _Paths.YIELD;
+  static const ADD_YIELD = _Paths.ADD_YIELD;
+  static const VIEW_YIELD = _Paths.VIEW_YIELD;
+  static const EDIT_YIELD = _Paths.EDIT_YIELD;
+  static const SALES = _Paths.SALES;
+  static const ADD_SALES = _Paths.ADD_SALES;
+  static const SALES_REVIEW = _Paths.SALES_REVIEW;
+  static const VIEW_SALES = _Paths.VIEW_SALES;
+  static const EDIT_SALES = _Paths.EDIT_SALES;
+  static const DASHBOARD = _Paths.DASHBOARD;
+
 }
 
 abstract class _Paths {
@@ -70,4 +85,18 @@ abstract class _Paths {
   static const ADD_MERCHANT = '/add_merchant';
   static const VIEW_MERCHANT = '/view_merchant';
   static const EDIT_MERCHANT = '/edit_merchant';
+  static const FARM_SEGMENT = '/farm_segments';
+  static const ADD_FARM_SEGMENT = '/add_farm_segments';
+  static const VIEW_FARM_SEGMENT = '/view_farm_segments';
+  static const EDIT_FARM_SEGMENT = '/edit_farm_segments';
+  static const YIELD = '/yield';
+  static const ADD_YIELD = '/add_yield';
+  static const VIEW_YIELD = '/view_yield';
+  static const EDIT_YIELD = '/edit_yield';
+  static const SALES = '/sales';
+  static const ADD_SALES = '/add_sales';
+  static const SALES_REVIEW = '/sales_review';
+  static const VIEW_SALES = '/view_sales';
+  static const EDIT_SALES = '/edit_sales';
+  static const DASHBOARD = '/dashboard';
 }
