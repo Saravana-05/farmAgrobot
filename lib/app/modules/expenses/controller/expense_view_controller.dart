@@ -29,38 +29,37 @@ class ExpensesViewController extends GetxController {
   var hasNext = false.obs;
   var hasPrevious = false.obs;
 
-  // Company details for PDF (hardcoded as requested)
+  // Company details for PDF
   final String companyName = "Your Company Name";
   final String companyAddress =
       "123 Business Street\nCity, State 12345\nPhone: +91 98765 43210\nEmail: info@company.com";
-  final String companyLogo =
-      "assets/images/xeLogo.png"; // Add your logo asset path
+  final String companyLogo = "assets/images/xeLogo.png";
 
   @override
   void onInit() {
     super.onInit();
-    loadExpenses();
-    refreshExpenses();
+    loadExpenses(showMessages: false); // Don't show messages on init
+    refreshExpenses(showMessages: false); // Don't show messages on init
   }
 
   void onRouteBack() {
     if (Get.currentRoute == Routes.EXPENSES) {
-      refreshExpenses();
+      refreshExpenses(showMessages: false); // Don't show messages on route back
     }
   }
 
   @override
   void onReady() {
     super.onReady();
-    loadExpenses();
+    loadExpenses(showMessages: false); // Don't show messages on ready
   }
 
   void onResume() {
-    refreshExpenses();
+    refreshExpenses(showMessages: false); // Don't show messages on resume
   }
 
-  // FIXED: Load expenses from API with proper null safety
-  Future<void> loadExpenses() async {
+  // FIXED: Load expenses with optional message display
+  Future<void> loadExpenses({bool showMessages = true}) async {
     try {
       isLoading.value = true;
 
@@ -110,23 +109,30 @@ class ExpensesViewController extends GetxController {
           allExpenses.value = filteredExpenses;
         }
       } else {
-        CustomSnackbar.showError(title: 'Error', message: response['message']);
+        // Only show error messages when explicitly requested
+        if (showMessages) {
+          CustomSnackbar.showError(title: 'Error', message: response['message']);
+        }
       }
     } catch (e) {
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
+      // Only show error messages when explicitly requested
+      if (showMessages) {
+        CustomSnackbar.showError(title: 'Error', message: 'Failed to load expenses');
+      }
+      print('Load expenses error: $e'); // Keep console logging for debugging
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Search expenses
+  // Search expenses - show messages only for user-initiated searches
   void runFilter(String keyword) {
     searchKeyword.value = keyword;
     currentPage.value = 1;
-    loadExpenses();
+    loadExpenses(showMessages: false); // Don't show messages for filtering
   }
 
-  // Date filtering
+  // Date filtering - don't show messages for date changes
   void selectFromDate(DateTime? date) {
     if (date != null) {
       fromDate.value = date;
@@ -134,7 +140,7 @@ class ExpensesViewController extends GetxController {
         toDate.value = null;
       }
       currentPage.value = 1;
-      loadExpenses();
+      loadExpenses(showMessages: false);
     }
   }
 
@@ -142,22 +148,22 @@ class ExpensesViewController extends GetxController {
     if (date != null) {
       toDate.value = date;
       currentPage.value = 1;
-      loadExpenses();
+      loadExpenses(showMessages: false);
     }
   }
 
-  // Pagination
+  // Pagination - don't show messages for page changes
   void nextPage() {
     if (hasNext.value) {
       currentPage.value++;
-      loadExpenses();
+      loadExpenses(showMessages: false);
     }
   }
 
   void previousPage() {
     if (hasPrevious.value) {
       currentPage.value--;
-      loadExpenses();
+      loadExpenses(showMessages: false);
     }
   }
 
@@ -174,10 +180,10 @@ class ExpensesViewController extends GetxController {
       }
       return status == PermissionStatus.granted;
     }
-    return true; // iOS doesn't need explicit storage permission for app documents
+    return true;
   }
 
-  // FIXED: Get all expenses for export with proper null safety
+  // Get all expenses for export - no messages needed
   Future<List<ExpenseModel>> _getAllExpensesForExport() async {
     try {
       String? fromDateStr = fromDate.value != null
@@ -189,7 +195,7 @@ class ExpensesViewController extends GetxController {
 
       final response = await ExpenseService.getAllExpenses(
         page: 1,
-        limit: 10000, // Large limit to get all expenses
+        limit: 10000,
         search: searchKeyword.value.isNotEmpty ? searchKeyword.value : null,
         dateFrom: fromDateStr,
         dateTo: toDateStr,
@@ -219,7 +225,7 @@ class ExpensesViewController extends GetxController {
     return [];
   }
 
-  // COMPLETELY FIXED: Export to Excel with proper null safety and correct syntax
+  // FIXED: Export to Excel - only show meaningful messages
   Future<void> exportToExcel() async {
     if (isExporting.value) return;
 
@@ -230,18 +236,17 @@ class ExpensesViewController extends GetxController {
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
         CustomSnackbar.showError(
-            title: 'Error',
-            message: 'Storage permission is required to save Excel file');
+            title: 'Permission Required',
+            message: 'Storage permission is needed to save the file');
         return;
       }
 
       // Get all expenses for export
-      List<ExpenseModel> allExpensesForExport =
-          await _getAllExpensesForExport();
+      List<ExpenseModel> allExpensesForExport = await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
         CustomSnackbar.showError(
-          title: 'Error',
+          title: 'No Data',
           message: 'No expenses found to export',
         );
         return;
@@ -256,7 +261,7 @@ class ExpensesViewController extends GetxController {
         excel.delete('Sheet1');
       }
 
-      // Add headers with FIXED syntax
+      // Add headers
       List<String> headers = [
         'S.No',
         'Date',
@@ -271,7 +276,7 @@ class ExpensesViewController extends GetxController {
       for (int i = 0; i < headers.length; i++) {
         var cell = sheetObject
             .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-        cell.value = TextCellValue(headers[i]); // FIXED: Use TextCellValue
+        cell.value = TextCellValue(headers[i]);
         cell.cellStyle = CellStyle(
           bold: true,
           backgroundColorHex: ExcelColor.green,
@@ -279,7 +284,7 @@ class ExpensesViewController extends GetxController {
         );
       }
 
-      // Add data rows with null safety
+      // Add data rows
       for (int i = 0; i < allExpensesForExport.length; i++) {
         ExpenseModel expense = allExpensesForExport[i];
         List<dynamic> rowData = [
@@ -297,7 +302,6 @@ class ExpensesViewController extends GetxController {
           var cell = sheetObject.cell(
               CellIndex.indexByColumnRow(columnIndex: j, rowIndex: i + 1));
 
-          // FIXED: Handle different data types properly
           var value = rowData[j];
           if (value is String) {
             cell.value = TextCellValue(value);
@@ -309,23 +313,22 @@ class ExpensesViewController extends GetxController {
         }
       }
 
-      // Add summary row with FIXED syntax
+      // Add summary row
       int summaryRow = allExpensesForExport.length + 2;
       var totalCell = sheetObject.cell(
           CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: summaryRow));
-      totalCell.value = TextCellValue('TOTAL:'); // FIXED: Use TextCellValue
+      totalCell.value = TextCellValue('TOTAL:');
       totalCell.cellStyle = CellStyle(bold: true);
 
       var amountCell = sheetObject.cell(
           CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: summaryRow));
-      amountCell.value =
-          DoubleCellValue(totalAmount.value); // FIXED: Use DoubleCellValue
+      amountCell.value = DoubleCellValue(totalAmount.value);
       amountCell.cellStyle = CellStyle(
         bold: true,
         backgroundColorHex: ExcelColor.green,
       );
 
-      // Get directory and save file with null safety
+      // Get directory and save file
       Directory? directory;
       if (Platform.isAndroid) {
         directory = Directory('/storage/emulated/0/Download/Expenses');
@@ -353,27 +356,23 @@ class ExpensesViewController extends GetxController {
 
       await file.writeAsBytes(excelBytes);
 
-      Get.snackbar(
-        'Export Complete',
-        'Excel file saved to: $filePath',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: Duration(seconds: 5),
+      // Show single success message
+      CustomSnackbar.showSuccess(
+        title: 'Export Complete',
+        message: 'Excel file saved successfully',
       );
     } catch (e) {
       print('Excel export error: $e');
-      Get.snackbar(
-        'Export Failed',
-        'Error creating Excel file: ${e.toString()}',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      CustomSnackbar.showError(
+        title: 'Export Failed',
+        message: 'Could not create Excel file',
       );
     } finally {
       isExporting.value = false;
     }
   }
 
-  // COMPLETELY FIXED: PDF Export with comprehensive null safety
+  // FIXED: PDF Export - only show meaningful messages
   Future<void> downloadExpenseBills() async {
     if (isDownloading.value) return;
 
@@ -383,20 +382,25 @@ class ExpensesViewController extends GetxController {
       // Check permission
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
-        CustomSnackbar.showError(title: 'Error', message: 'Permission denied');
+        CustomSnackbar.showError(
+          title: 'Permission Required', 
+          message: 'Storage permission is needed to save the file'
+        );
         return;
       }
 
       // Get all expenses for export
-      List<ExpenseModel> allExpensesForExport =
-          await _getAllExpensesForExport();
+      List<ExpenseModel> allExpensesForExport = await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
-        CustomSnackbar.showError(title: 'Error', message: 'No data to export');
+        CustomSnackbar.showError(
+          title: 'No Data', 
+          message: 'No expenses found to export'
+        );
         return;
       }
 
-      // Create PDF with enhanced null safety
+      // Create PDF
       final pdf = pw.Document();
 
       pdf.addPage(
@@ -405,7 +409,7 @@ class ExpensesViewController extends GetxController {
           margin: pw.EdgeInsets.all(20),
           build: (pw.Context context) {
             return [
-              // Header with company info - FIXED null safety
+              // Header with company info
               pw.Container(
                 padding: pw.EdgeInsets.only(bottom: 20),
                 decoration: pw.BoxDecoration(
@@ -436,7 +440,7 @@ class ExpensesViewController extends GetxController {
 
               pw.SizedBox(height: 20),
 
-              // Report title and date range - FIXED
+              // Report title and date range
               pw.Center(
                 child: pw.Column(
                   children: [
@@ -446,7 +450,6 @@ class ExpensesViewController extends GetxController {
                           fontSize: 18, fontWeight: pw.FontWeight.bold),
                     ),
                     pw.SizedBox(height: 10),
-                    // FIXED: Safe date range handling
                     if (_getSafeDateRange().isNotEmpty)
                       pw.Text(
                         _getSafeDateRange(),
@@ -462,7 +465,7 @@ class ExpensesViewController extends GetxController {
 
               pw.SizedBox(height: 20),
 
-              // Summary box - FIXED null safety
+              // Summary box
               pw.Container(
                 padding: pw.EdgeInsets.all(15),
                 decoration: pw.BoxDecoration(
@@ -476,8 +479,7 @@ class ExpensesViewController extends GetxController {
                     pw.Column(
                       children: [
                         pw.Text('Total Expenses',
-                            style:
-                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text('${allExpensesForExport.length}',
                             style: pw.TextStyle(fontSize: 16)),
                       ],
@@ -485,8 +487,7 @@ class ExpensesViewController extends GetxController {
                     pw.Column(
                       children: [
                         pw.Text('Total Amount',
-                            style:
-                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text('₹${_getSafeTotalAmount()}',
                             style: pw.TextStyle(
                                 fontSize: 16, color: PdfColors.green800)),
@@ -498,7 +499,7 @@ class ExpensesViewController extends GetxController {
 
               pw.SizedBox(height: 20),
 
-              // COMPLETELY FIXED: Expenses table with comprehensive null safety
+              // Expenses table
               pw.Table(
                 border: pw.TableBorder.all(),
                 columnWidths: {
@@ -524,7 +525,7 @@ class ExpensesViewController extends GetxController {
                       _buildTableCell('Payment Mode', isHeader: true),
                     ],
                   ),
-                  // Data rows with COMPREHENSIVE null safety
+                  // Data rows
                   ...allExpensesForExport.asMap().entries.map((entry) {
                     int index = entry.key;
                     ExpenseModel expense = entry.value;
@@ -537,13 +538,11 @@ class ExpensesViewController extends GetxController {
                       ),
                       children: [
                         _buildTableCell('${index + 1}'),
-                        _buildTableCell(
-                            _formatExpenseDate(expense.expenseDate)),
+                        _buildTableCell(_formatExpenseDate(expense.expenseDate)),
                         _buildTableCell(
                             _getSafeString(expense.expenseName, 'No Name')),
                         _buildTableCell(_getSafeString(
                             expense.expenseCategory, 'No Category')),
-                        // FIXED: Safe amount handling
                         _buildTableCell(_getSafeAmount(expense.amount)),
                         _buildTableCell(
                             _getSafeString(expense.spentBy, 'Unknown')),
@@ -573,7 +572,7 @@ class ExpensesViewController extends GetxController {
         ),
       );
 
-      // Save PDF file with enhanced null safety
+      // Save PDF file
       Directory? directory;
       if (Platform.isAndroid) {
         try {
@@ -600,17 +599,23 @@ class ExpensesViewController extends GetxController {
       final pdfBytes = await pdf.save();
       await file.writeAsBytes(pdfBytes);
 
-      // Show success message
-      CustomSnackbar.showInfo(title: 'Info', message: 'PDF downloaded');
+      // Show single success message
+      CustomSnackbar.showSuccess(
+        title: 'PDF Downloaded',
+        message: 'Report saved successfully',
+      );
     } catch (e) {
-      // Show error message
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
+      print('PDF export error: $e');
+      CustomSnackbar.showError(
+        title: 'Download Failed',
+        message: 'Could not create PDF report',
+      );
     } finally {
       isDownloading.value = false;
     }
   }
 
-  // FIXED: Helper method to safely get string values
+  // Helper methods (unchanged but with better error handling)
   String _getSafeString(String? value, String defaultValue) {
     if (value == null || value.isEmpty) {
       return defaultValue;
@@ -618,7 +623,6 @@ class ExpensesViewController extends GetxController {
     return value;
   }
 
-  // FIXED: Helper method to safely get amount
   String _getSafeAmount(dynamic amount) {
     if (amount == null) return '0';
 
@@ -635,7 +639,6 @@ class ExpensesViewController extends GetxController {
     return '0';
   }
 
-  // FIXED: Helper method to safely get total amount
   String _getSafeTotalAmount() {
     try {
       return totalAmount.value.toStringAsFixed(0);
@@ -645,7 +648,6 @@ class ExpensesViewController extends GetxController {
     }
   }
 
-  // FIXED: Helper method to safely get date range
   String _getSafeDateRange() {
     try {
       String fromDateStr = 'Start';
@@ -668,28 +670,21 @@ class ExpensesViewController extends GetxController {
     return '';
   }
 
-  // COMPLETELY FIXED: Helper method to format dynamic expense date
   String _formatExpenseDate(dynamic date) {
     if (date == null) return 'No Date';
 
     try {
-      // If it's already a DateTime
       if (date is DateTime) {
         return formatTimestamp(date);
       }
 
-      // If it's a string, try to parse it
       if (date is String) {
         if (date.isEmpty) return 'No Date';
 
-        // Try different date formats
         DateTime? parsedDate;
-
-        // Try ISO format first
         try {
           parsedDate = DateTime.parse(date);
         } catch (e) {
-          // Try other common formats
           try {
             parsedDate = DateFormat('yyyy-MM-dd').parse(date);
           } catch (e) {
@@ -699,7 +694,7 @@ class ExpensesViewController extends GetxController {
               try {
                 parsedDate = DateFormat('MM/dd/yyyy').parse(date);
               } catch (e) {
-                return date; // Return original string if parsing fails
+                return date;
               }
             }
           }
@@ -708,12 +703,10 @@ class ExpensesViewController extends GetxController {
         return parsedDate != null ? formatTimestamp(parsedDate) : date;
       }
 
-      // If it's a number (timestamp)
       if (date is int) {
         return formatTimestamp(DateTime.fromMillisecondsSinceEpoch(date));
       }
 
-      // Fallback: convert to string
       return date.toString();
     } catch (e) {
       print('Error formatting expense date: $e');
@@ -721,7 +714,6 @@ class ExpensesViewController extends GetxController {
     }
   }
 
-  // FIXED: Helper method to build table cells for PDF
   pw.Widget _buildTableCell(String text, {bool isHeader = false}) {
     return pw.Container(
       padding: pw.EdgeInsets.all(5),
@@ -737,7 +729,7 @@ class ExpensesViewController extends GetxController {
     );
   }
 
-  // Delete expense
+  // FIXED: Delete expense - only show messages for user actions
   Future<void> deleteExpense(String id) async {
     try {
       isLoading.value = true;
@@ -746,27 +738,27 @@ class ExpensesViewController extends GetxController {
 
       if (success) {
         CustomSnackbar.showSuccess(
-            title: 'Success', message: 'Expense deleted');
-
-        loadExpenses();
+            title: 'Deleted', message: 'Expense deleted successfully');
+        loadExpenses(showMessages: false); // Reload without messages
       } else {
         CustomSnackbar.showError(
-            title: 'Error', message: 'Expense not deleted');
+            title: 'Delete Failed', message: 'Could not delete expense');
       }
     } catch (e) {
-      
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
+      print('Delete expense error: $e');
+      CustomSnackbar.showError(
+          title: 'Error', message: 'Failed to delete expense');
     } finally {
       isLoading.value = false;
     }
   }
 
   void editExpense(ExpenseModel expense) {
-   
-    CustomSnackbar.showInfo(title: 'Info', message: 'Edit functionality would be implemented here');
+    // Remove the info message - just implement the functionality
+    print('Edit expense: ${expense.id}');
+    // Add your edit navigation logic here
   }
 
-  // FIXED: viewExpense with proper null safety
   void viewExpense(ExpenseModel expense) {
     Get.dialog(
       AlertDialog(
@@ -801,9 +793,9 @@ class ExpensesViewController extends GetxController {
     );
   }
 
-  Future<void> refreshExpenses() async {
+  Future<void> refreshExpenses({bool showMessages = true}) async {
     currentPage.value = 1;
-    await loadExpenses();
+    await loadExpenses(showMessages: showMessages);
   }
 
   void clearFilters() {
@@ -811,10 +803,9 @@ class ExpensesViewController extends GetxController {
     toDate.value = null;
     searchKeyword.value = '';
     currentPage.value = 1;
-    loadExpenses();
+    loadExpenses(showMessages: false); // Don't show messages for filter clearing
   }
 
-  // COMPLETELY FIXED: formatTimestamp with comprehensive null safety
   String formatTimestamp(dynamic date) {
     if (date == null) {
       return 'No Date';

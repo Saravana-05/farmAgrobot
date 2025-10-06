@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
+import '../../../core/values/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
+import '../../../global_widgets/custom_snackbar/flash_message.dart';
 import '../../../routes/app_pages.dart';
 
 class AddExpensesController extends GetxController {
@@ -67,18 +68,6 @@ class AddExpensesController extends GetxController {
     super.onClose();
   }
 
-  Future<void> selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: Get.context!,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) {
-      dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-    }
-  }
-
   void selectImage() {
     Get.dialog(
       AlertDialog(
@@ -120,7 +109,7 @@ class AddExpensesController extends GetxController {
       );
 
       if (pickedFile == null) {
-        CustomSnackbar.showInfo(title: 'Info', message: 'No image selected');
+        CustomFlashMessage.showInfo(title: 'Info', message: 'No image selected');
         return;
       }
 
@@ -130,67 +119,164 @@ class AddExpensesController extends GetxController {
       // Set the image directly
       image.value = imageBytes;
 
-      CustomSnackbar.showInfo(
+      CustomFlashMessage.showInfo(
           title: 'Info', message: 'Image selected successfully');
     } catch (e) {
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
+      CustomFlashMessage.showError(title: 'Error', message: e.toString());
     } finally {
       isUploading.value = false;
     }
   }
 
   bool _validateForm() {
+    // Expense name validation (matches backend: not empty, min 2 chars)
     if (expNameController.text.trim().isEmpty) {
-      CustomSnackbar.showError(
-          title: 'Error', message: 'Please enter expense name');
+      CustomFlashMessage.showError(
+          title: 'Error', message: 'Expense name cannot be empty');
       return false;
     }
 
+    if (expNameController.text.trim().length < 2) {
+      CustomFlashMessage.showError(
+          title: 'Error',
+          message: 'Expense name must be at least 2 characters');
+      return false;
+    }
+
+    // Date validation
     if (dateController.text.trim().isEmpty) {
-      CustomSnackbar.showError(
+      CustomFlashMessage.showError(
           title: 'Error', message: 'Please select expense date');
       return false;
     }
 
+    // Category validation
     if (selectedCategoryTypes.value == null ||
         selectedCategoryTypes.value!.isEmpty) {
-      CustomSnackbar.showError(
+      CustomFlashMessage.showError(
           title: 'Error', message: 'Please select expense category');
-
       return false;
     }
 
+    // Amount validation (matches backend: > 0, not too large)
     if (amountController.text.trim().isEmpty) {
-      CustomSnackbar.showError(title: 'Error', message: 'Please enter amount');
+      CustomFlashMessage.showError(title: 'Error', message: 'Please enter amount');
       return false;
     }
 
-    if (double.tryParse(amountController.text.trim()) == null) {
-      CustomSnackbar.showError(title: 'Error', message: 'Please enter amount');
+    double? amount = double.tryParse(amountController.text.trim());
+    if (amount == null) {
+      CustomFlashMessage.showError(
+          title: 'Error', message: 'Please enter a valid amount');
       return false;
     }
 
-    if (spentByController.text.trim().isEmpty) {
-      CustomSnackbar.showError(
-          title: 'Error', message: 'Please enter spent by');
+    if (amount <= 0) {
+      CustomFlashMessage.showError(
+          title: 'Error', message: 'Amount must be greater than 0');
       return false;
     }
 
+    if (amount > 999999999.99) {
+      CustomFlashMessage.showError(title: 'Error', message: 'Amount is too large');
+      return false;
+    }
+
+    // Mode of payment validation
     if (selectedModeOfPayment.value == null ||
         selectedModeOfPayment.value!.isEmpty) {
-      CustomSnackbar.showError(
+      CustomFlashMessage.showError(
           title: 'Error', message: 'Please select mode of payment');
-
       return false;
     }
 
     return true;
   }
 
+  // Date validation method (restrict future dates)
+  bool validateDate(String dateText) {
+    if (dateText.isEmpty) return false;
+
+    try {
+      // Parse the date from the dateController text
+      // Adjust the format based on how you format the date in your selectDate method
+      DateTime selectedDate =
+          DateTime.parse(dateText); // Modify this based on your date format
+      DateTime currentDate = DateTime.now();
+
+      // Remove time component for comparison
+      selectedDate =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      currentDate =
+          DateTime(currentDate.year, currentDate.month, currentDate.day);
+
+      if (selectedDate.isAfter(currentDate)) {
+        Get.snackbar(
+          'Invalid Date',
+          'Future dates are not allowed for expenses',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.orange.withOpacity(0.1),
+          colorText: Colors.orange,
+          icon: const Icon(Icons.calendar_today, color: Colors.orange),
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(10),
+          borderRadius: 8,
+        );
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      Get.snackbar(
+        'Invalid Date Format',
+        'Please select a valid date',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.withOpacity(0.1),
+        colorText: Colors.red,
+        icon: const Icon(Icons.error_outline, color: Colors.red),
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(10),
+        borderRadius: 8,
+      );
+      return false;
+    }
+  }
+
+// Updated selectDate method with future date restriction
+  Future<void> selectDate() async {
+    DateTime? selectedDate = await showDatePicker(
+      context: Get.context!,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(), // Restrict to current date and earlier
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: kPrimaryColor,
+              onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate != null) {
+      // Format the date as needed (adjust format as per your requirement)
+      String formattedDate =
+          "${selectedDate.day.toString().padLeft(2, '0')}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.year}";
+      dateController.text = formattedDate;
+    }
+  }
+
   void saveExpense() async {
     if (isSaving.value) return;
 
     if (!_validateForm()) return;
+
+    // Validate date before sending to server
+    if (!validateDate(dateController.text)) return;
 
     try {
       isSaving.value = true;
@@ -202,7 +288,8 @@ class AddExpensesController extends GetxController {
         expenseCategory: selectedCategoryTypes.value!,
         description: descriptionController.text.trim(),
         amount: double.parse(amountController.text.trim()),
-        spentBy: spentByController.text.trim(),
+        spentBy: spentByController.text
+            .trim(), // Send even if empty - let backend handle
         modeOfPayment: selectedModeOfPayment.value!,
       );
 
@@ -215,7 +302,7 @@ class AddExpensesController extends GetxController {
       );
 
       if (result['success']) {
-        CustomSnackbar.showSuccess(
+        CustomFlashMessage.showSuccess(
           title: 'Success',
           message: result['message'],
         );
@@ -227,10 +314,28 @@ class AddExpensesController extends GetxController {
         // Navigate back with success result
         Get.offAllNamed(Routes.EXPENSES, arguments: true);
       } else {
-        CustomSnackbar.showError(title: 'Error', message: result['message']);
+        // Handle backend validation errors
+        String errorMessage = result['message'];
+
+        // Check if there are specific field errors from backend
+        if (result.containsKey('errors') && result['errors'] != null) {
+          Map<String, dynamic> errors = result['errors'];
+
+          // Handle specific backend validation errors
+          if (errors.containsKey('spent_by')) {
+            errorMessage =
+                errors['spent_by'][0]; // Django returns array of errors
+          } else if (errors.containsKey('expense_name')) {
+            errorMessage = errors['expense_name'][0];
+          } else if (errors.containsKey('amount')) {
+            errorMessage = errors['amount'][0];
+          }
+        }
+
+        CustomFlashMessage.showError(title: 'Error', message: errorMessage);
       }
     } catch (e) {
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
+      CustomFlashMessage.showError(title: 'Error', message: e.toString());
     } finally {
       isSaving.value = false;
     }

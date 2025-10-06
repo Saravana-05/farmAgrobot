@@ -34,7 +34,11 @@ class AddExpenses extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildTextField(
-                  'Expense Name', controller.expNameController, Icons.money),
+                'Expense Name',
+                controller.expNameController,
+                Icons.money,
+                isRequired: true,
+              ),
               const SizedBox(height: 20.0),
               _buildDateField(controller),
               const SizedBox(height: 20.0),
@@ -52,14 +56,45 @@ class AddExpenses extends StatelessWidget {
                 controller.amountController,
                 Icons.money_off_sharp,
                 isNumeric: true,
+                isRequired: true,
               ),
               const SizedBox(height: 20.0),
               _buildTextField(
-                  'Spent By', controller.spentByController, Icons.person_add),
+                'Spent By',
+                controller.spentByController,
+                Icons.person_add,
+                isRequired: true,
+              ),
               const SizedBox(height: 20.0),
               _buildModeOfPaymentDropdown(controller),
               const SizedBox(height: 20.0),
               _buildImagePicker(controller),
+              const SizedBox(height: 30.0),
+              // Required fields note
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8.0),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Fields marked with * are required',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20.0),
               Obx(() => CustomElevatedButton(
                     text: controller.isSaving.value
@@ -68,6 +103,8 @@ class AddExpenses extends StatelessWidget {
                     onPressed: controller.isSaving.value
                         ? () {}
                         : () => controller.saveExpense(),
+                    backgroundColor: kPrimaryColor,
+                    textColor: kLightColor,
                   ))
             ],
           ),
@@ -86,6 +123,7 @@ class AddExpenses extends StatelessWidget {
     IconData icon, {
     bool isNumeric = false,
     bool isMultiline = false,
+    bool isRequired = false,
     Color iconColor = kPrimaryColor,
   }) {
     return TextField(
@@ -96,12 +134,25 @@ class AddExpenses extends StatelessWidget {
       maxLines: isMultiline ? null : 1,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: iconColor),
-        labelText: label,
+        labelText: isRequired ? '$label *' : label,
+        hintText: isRequired ? 'This field is required' : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(50.0),
           borderSide: const BorderSide(color: kSecondaryColor),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kSecondaryColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(
+            color: kPrimaryColor,
+            width: 2.0,
+          ),
+        ),
         labelStyle: const TextStyle(color: kSecondaryColor),
+
       ),
     );
   }
@@ -113,12 +164,36 @@ class AddExpenses extends StatelessWidget {
       onTap: () => controller.selectDate(),
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.date_range, color: kPrimaryColor),
-        labelText: 'Expense Date',
+        labelText: 'Expense Date *',
+        hintText: 'This field is required',
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(50.0),
           borderSide: const BorderSide(color: kSecondaryColor),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kSecondaryColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(
+            color: kPrimaryColor,
+            width: 2.0,
+          ),
+        ),
         labelStyle: const TextStyle(color: kSecondaryColor),
+        suffixIcon: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 8),
+            Icon(
+              Icons.calendar_today,
+              color: kSecondaryColor,
+              size: 20,
+            ),
+            SizedBox(width: 12),
+          ],
+        ),
       ),
     );
   }
@@ -136,14 +211,33 @@ class AddExpenses extends StatelessWidget {
             );
           }).toList(),
           decoration: InputDecoration(
-            labelText: 'Expense Category',
+            labelText: 'Expense Category *',
+            hintText: 'This field is required',
             prefixIcon: const Icon(Icons.category, color: kPrimaryColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(50.0),
               borderSide: const BorderSide(color: kSecondaryColor),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kSecondaryColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(
+                color: kPrimaryColor,
+                width: 2.0,
+              ),
+            ),
             labelStyle: const TextStyle(color: kSecondaryColor),
+
           ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please select a category';
+            }
+            return null;
+          },
         ));
   }
 
@@ -160,14 +254,33 @@ class AddExpenses extends StatelessWidget {
             );
           }).toList(),
           decoration: InputDecoration(
-            labelText: 'Mode of Payment',
+            labelText: 'Mode of Payment *',
+            hintText: 'This field is required',
             prefixIcon: const Icon(Icons.payment, color: kPrimaryColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(50.0),
               borderSide: const BorderSide(color: kSecondaryColor),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kSecondaryColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(
+                color: kPrimaryColor,
+                width: 2.0,
+              ),
+            ),
             labelStyle: const TextStyle(color: kSecondaryColor),
+
           ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please select a payment mode';
+            }
+            return null;
+          },
         ));
   }
 
@@ -211,7 +324,7 @@ class AddExpenses extends StatelessWidget {
             Expanded(
               child: Obx(() => TextField(
                     decoration: InputDecoration(
-                      labelText: 'Upload Expense Bill',
+                      labelText: 'Upload Expense Bill (Optional)',
                       hintText: controller.isUploading.value
                           ? 'Processing...'
                           : 'Choose a receipt image',
