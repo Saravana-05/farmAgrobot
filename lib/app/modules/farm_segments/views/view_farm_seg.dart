@@ -7,7 +7,8 @@ import '../../../routes/app_pages.dart';
 import '../controller/view_farm_seg_controller.dart';
 
 class ViewFarmSegments extends StatelessWidget {
-  final FarmSegmentViewController controller = Get.put(FarmSegmentViewController());
+  final FarmSegmentViewController controller =
+      Get.put(FarmSegmentViewController());
 
   final TextStyle textStyle = const TextStyle(fontSize: 12.0);
   final TextStyle boldTextStyle =
@@ -43,68 +44,16 @@ class ViewFarmSegments extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8.0),
-
           // Action buttons and summary
           Container(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.all(2),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    // Add Farm Segment Button
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => Get.toNamed(Routes.ADD_FARM_SEGMENT),
-                        icon: Icon(Icons.add, color: Colors.white),
-                        label: Text(
-                          'Add New Farm Segment',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimaryColor,
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-
-                    // Refresh Button
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Obx(() => controller.isLoading.value
-                          ? Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: kPrimaryColor,
-                                ),
-                              ),
-                            )
-                          : IconButton(
-                              onPressed: controller.refreshFarmSegments,
-                              icon: Icon(Icons.refresh, color: kPrimaryColor),
-                            )),
-                    ),
-                  ],
-                ),
-
                 // Summary Information
-                SizedBox(height: 16),
+                SizedBox(height: 8),
                 Obx(() => Container(
-                      padding: EdgeInsets.all(12),
+                      padding: EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: kPrimaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -150,7 +99,7 @@ class ViewFarmSegments extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.agriculture, size: 64, color: Colors.grey),
+            Icon(Icons.agriculture, size: 48, color: Colors.grey),
             SizedBox(height: 16),
             Text('No farm segments found.'),
             SizedBox(height: 8),
@@ -186,21 +135,22 @@ class ViewFarmSegments extends StatelessWidget {
                     children: [
                       // Farm Segment Icon
                       Container(
-                        width: 60,
-                        height: 60,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
-                          color: kPrimaryColor.withOpacity(0.2),
+                          color: kPrimaryColor,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: kPrimaryColor.withOpacity(0.3)),
+                          border:
+                              Border.all(color: kPrimaryColor.withOpacity(0.3)),
                         ),
                         child: Icon(
                           Icons.agriculture,
-                          color: kPrimaryColor,
+                          color: kTertiaryColor,
                           size: 30,
                         ),
                       ),
 
-                      SizedBox(width: 12),
+                      SizedBox(width: 8),
 
                       // Farm Segment Details
                       Expanded(
@@ -210,27 +160,8 @@ class ViewFarmSegments extends StatelessWidget {
                             Text(
                               farmSegment.farmName,
                               style: boldTextStyle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (farmSegment.createdAt != null) ...[
-                              SizedBox(height: 4),
-                              Text(
-                                'Added on ${DateFormat('dd MMM yyyy').format(farmSegment.createdAt!)}',
-                                style: textStyle,
-                              ),
-                            ],
-                            if (farmSegment.updatedAt != null &&
-                                farmSegment.updatedAt != farmSegment.createdAt) ...[
-                              SizedBox(height: 2),
-                              Text(
-                                'Updated ${DateFormat('dd MMM yyyy').format(farmSegment.updatedAt!)}',
-                                style: textStyle.copyWith(
-                                  color: Colors.grey[600],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ],
+                              textAlign: TextAlign.center,
+                            )
                           ],
                         ),
                       ),
@@ -423,26 +354,6 @@ class ViewFarmSegments extends StatelessWidget {
                         farmSegment.id,
                         Icons.tag,
                       ),
-
-                      if (farmSegment.createdAt != null) ...[
-                        SizedBox(height: 16),
-                        _buildDetailRow(
-                          'Created Date',
-                          DateFormat('dd MMM yyyy, hh:mm a')
-                              .format(farmSegment.createdAt!),
-                          Icons.calendar_today,
-                        ),
-                      ],
-
-                      if (farmSegment.updatedAt != null &&
-                          farmSegment.updatedAt != farmSegment.createdAt) ...[
-                        SizedBox(height: 16),
-                        _buildDetailRow(
-                          'Last Updated',
-                          controller.formatTimestamp(farmSegment.updatedAt),
-                          Icons.update,
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -555,7 +466,8 @@ class ViewFarmSegments extends StatelessWidget {
     Get.dialog(
       AlertDialog(
         title: Text("Confirm Deletion"),
-        content: Text("Are you sure you want to delete '${farmSegment.farmName}'?"),
+        content:
+            Text("Are you sure you want to delete '${farmSegment.farmName}'?"),
         actions: [
           TextButton(
             onPressed: () => Get.back(),

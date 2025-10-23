@@ -54,6 +54,7 @@ class AddEmployee extends StatelessWidget {
                 controller.contactController,
                 Icons.phone,
                 isNumeric: true,
+                maxLength: 10,
               ),
               const SizedBox(height: 20.0),
               _buildDateField(controller),
@@ -88,12 +89,14 @@ class AddEmployee extends StatelessWidget {
     bool isNumeric = false,
     bool isMultiline = false,
     Color iconColor = kPrimaryColor,
+    int? maxLength,
   }) {
     return TextField(
       controller: controller,
       keyboardType: isNumeric
           ? TextInputType.number
           : (isMultiline ? TextInputType.multiline : TextInputType.text),
+      maxLength: maxLength,
       maxLines: isMultiline ? null : 1,
       // Add Tamil font support like your EditEmployee module
       style: TextStyle(
@@ -129,9 +132,17 @@ class AddEmployee extends StatelessWidget {
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.date_range, color: kPrimaryColor),
         labelText: 'Joining Date',
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kSecondaryColor),
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(50.0),
           borderSide: const BorderSide(color: kSecondaryColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50.0),
+          borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
         ),
         labelStyle: const TextStyle(color: kSecondaryColor),
       ),
@@ -153,6 +164,14 @@ class AddEmployee extends StatelessWidget {
           decoration: InputDecoration(
             labelText: 'Employee Type',
             prefixIcon: const Icon(Icons.work, color: kPrimaryColor),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kSecondaryColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(50.0),
               borderSide: const BorderSide(color: kSecondaryColor),
@@ -177,9 +196,17 @@ class AddEmployee extends StatelessWidget {
           decoration: InputDecoration(
             labelText: 'Gender',
             prefixIcon: const Icon(Icons.person_outline, color: kPrimaryColor),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kSecondaryColor),
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(50.0),
               borderSide: const BorderSide(color: kSecondaryColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(50.0),
+              borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
             ),
             labelStyle: const TextStyle(color: kSecondaryColor),
           ),
@@ -237,7 +264,7 @@ class AddEmployee extends StatelessWidget {
                       Positioned.fill(
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: kSecondaryColor,
                             shape: BoxShape.circle,
                           ),
                           child: const Center(
@@ -258,7 +285,12 @@ class AddEmployee extends StatelessWidget {
                       hintText: controller.isUploading.value
                           ? 'Processing...'
                           : 'Choose a profile image',
-                      prefixIcon: const Icon(Icons.photo_camera),
+                      prefixIcon:
+                          const Icon(Icons.photo_camera, color: kPrimaryColor),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(50.0),
+                        borderSide: const BorderSide(color: kSecondaryColor),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(50.0),
                       ),

@@ -45,9 +45,8 @@ class ViewEmployees extends StatelessWidget {
                       EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   prefixIcon: Icon(Icons.search, color: kSecondaryColor),
                 ),
-                // Add support for Tamil text input
                 style: TextStyle(
-                  fontFamily: 'NotoSansTamil', // For Tamil text input
+                  fontFamily: 'NotoSansTamil',
                 ),
               ),
             ),
@@ -116,14 +115,24 @@ class ViewEmployees extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Profile Image with proper handling
+                      // Profile Image with gender indicator
                       GestureDetector(
                         onTap: () {
                           final imageUrl =
                               controller.getEmployeeImageUrl(employee);
                           _showImageDialog(imageUrl);
                         },
-                        child: _buildEmployeeAvatar(employee, 50),
+                        child: Stack(
+                          children: [
+                            _buildEmployeeAvatar(employee, 50),
+                            // Gender icon badge
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: _buildGenderBadge(employee.gender),
+                            ),
+                          ],
+                        ),
                       ),
 
                       SizedBox(width: 10),
@@ -137,8 +146,7 @@ class ViewEmployees extends StatelessWidget {
                             Text(
                               controller.getEmployeeDisplayName(employee),
                               style: boldTextStyle.copyWith(
-                                fontFamily:
-                                    'NotoSansTamil', // Tamil font support
+                                fontFamily: 'NotoSansTamil',
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -151,13 +159,24 @@ class ViewEmployees extends StatelessWidget {
                                 style: textStyle.copyWith(
                                   fontStyle: FontStyle.italic,
                                   color: Colors.grey[600],
-                                  fontFamily:
-                                      'NotoSansTamil', // Tamil font support
+                                  fontFamily: 'NotoSansTamil',
                                 ),
                               ),
-                            Text(
-                              '${employee.empType ?? 'N/A'} • ${employee.gender ?? 'N/A'}',
-                              style: textStyle,
+                            // Employee Type and Gender with icon
+                            Row(
+                              children: [
+                                Text(
+                                  employee.empType ?? 'N/A',
+                                  style: textStyle,
+                                ),
+                                Text(' • ', style: textStyle),
+                                _buildGenderIcon(employee.gender),
+                                SizedBox(width: 4),
+                                Text(
+                                  employee.gender ?? 'N/A',
+                                  style: textStyle,
+                                ),
+                              ],
                             ),
                             Row(
                               children: [
@@ -268,7 +287,6 @@ class ViewEmployees extends StatelessWidget {
                               _showEmployeeDetailsDialog(employee);
                               break;
                             case 'edit':
-                              // Updated to use Get.to() navigation
                               Get.toNamed(Routes.EDIT_EMPLOYEE,
                                   arguments: {'id': employee.id.toString()});
                               break;
@@ -292,6 +310,58 @@ class ViewEmployees extends StatelessWidget {
           child: Obx(() => _buildPaginationControls()),
         ),
       ],
+    );
+  }
+
+  // Helper method to build gender icon
+  Widget _buildGenderIcon(String? gender) {
+    if (gender == null) {
+      return Icon(Icons.help_outline, size: 14, color: Colors.grey);
+    }
+
+    String genderLower = gender.toLowerCase();
+
+    if (genderLower.contains('female') || genderLower.contains('woman')) {
+      return Icon(Icons.female, size: 14, color: Colors.pink[400]);
+    } else if (genderLower.contains('male') || genderLower.contains('man')) {
+      return Icon(Icons.male, size: 14, color: Colors.blue[400]);
+    } else {
+      return Icon(Icons.person_outline, size: 14, color: Colors.grey);
+    }
+  }
+
+  // Helper method to build gender badge on avatar
+  Widget _buildGenderBadge(String? gender) {
+    if (gender == null) {
+      return SizedBox.shrink();
+    }
+
+    String genderLower = gender.toLowerCase();
+    Color badgeColor;
+    IconData iconData;
+
+    if (genderLower.contains('female') || genderLower.contains('woman')) {
+      badgeColor = Colors.pink;
+      iconData = Icons.female;
+    } else if (genderLower.contains('male') || genderLower.contains('man')) {
+      badgeColor = Colors.blue;
+      iconData = Icons.male;
+    } else {
+      return SizedBox.shrink();
+    }
+
+    return Container(
+      padding: EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: badgeColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.5),
+      ),
+      child: Icon(
+        iconData,
+        size: 12,
+        color: Colors.white,
+      ),
     );
   }
 
@@ -349,7 +419,7 @@ class ViewEmployees extends StatelessWidget {
             color: Colors.white,
             fontSize: size * 0.35,
             fontWeight: FontWeight.bold,
-            fontFamily: 'NotoSansTamil', // Support Tamil initials
+            fontFamily: 'NotoSansTamil',
           ),
         ),
       ),
@@ -395,7 +465,6 @@ class ViewEmployees extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Previous button
         ElevatedButton.icon(
           onPressed:
               controller.hasPrevious.value ? controller.previousPage : null,
@@ -406,8 +475,6 @@ class ViewEmployees extends StatelessWidget {
             foregroundColor: Colors.white,
           ),
         ),
-
-        // Page info
         Container(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -422,8 +489,6 @@ class ViewEmployees extends StatelessWidget {
             ),
           ),
         ),
-
-        // Next button
         ElevatedButton.icon(
           onPressed: controller.hasNext.value ? controller.nextPage : null,
           icon: Icon(Icons.chevron_right, color: kLightColor),
@@ -457,7 +522,6 @@ class ViewEmployees extends StatelessWidget {
     controller.selectToDate(picked);
   }
 
-  // Employee Details Dialog
   void _showEmployeeDetailsDialog(Employee employee) {
     Get.dialog(
       Dialog(
@@ -470,7 +534,6 @@ class ViewEmployees extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
               Container(
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -501,22 +564,32 @@ class ViewEmployees extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Content
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Profile Image Section
                       Center(
-                        child: _buildEmployeeAvatar(employee, 120),
+                        child: Stack(
+                          children: [
+                            _buildEmployeeAvatar(employee, 120),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: _buildGenderBadge(employee.gender),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-
                       SizedBox(height: 24),
-
-                      // Employee Details
                       _buildDetailRow(
                           'Name',
                           controller.getEmployeeDisplayName(employee),
@@ -540,8 +613,8 @@ class ViewEmployees extends StatelessWidget {
                       _buildDetailRow('Employee Type',
                           employee.empType ?? 'N/A', Icons.work),
                       SizedBox(height: 16),
-                      _buildDetailRow('Gender', employee.gender ?? 'N/A',
-                          Icons.person_outline),
+                      _buildDetailRowWithGender(
+                          'Gender', employee.gender ?? 'N/A', employee.gender),
                       SizedBox(height: 16),
                       _buildDetailRow(
                           'Contact', employee.contact ?? 'N/A', Icons.phone),
@@ -564,8 +637,6 @@ class ViewEmployees extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Footer Actions
               Container(
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -661,6 +732,51 @@ class ViewEmployees extends StatelessWidget {
                         color: valueColor ?? Colors.black87,
                         fontFamily: useTamilFont ? 'NotoSansTamil' : null,
                       ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRowWithGender(
+    String label,
+    String value,
+    String? gender,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          _buildGenderIcon(gender),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
               ],
             ),
@@ -783,7 +899,16 @@ class ViewEmployees extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  _buildEmployeeAvatar(employee, 40),
+                  Stack(
+                    children: [
+                      _buildEmployeeAvatar(employee, 40),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: _buildGenderBadge(employee.gender),
+                      ),
+                    ],
+                  ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -863,7 +988,6 @@ class ViewEmployees extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Get.back();
-              // Call the controller method to toggle status
               controller.toggleEmployeeStatus(employee.id,
                   newStatus: !currentStatus);
             },
@@ -905,7 +1029,16 @@ class ViewEmployees extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  _buildEmployeeAvatar(employee, 40),
+                  Stack(
+                    children: [
+                      _buildEmployeeAvatar(employee, 40),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: _buildGenderBadge(employee.gender),
+                      ),
+                    ],
+                  ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(

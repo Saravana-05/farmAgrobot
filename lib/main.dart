@@ -48,7 +48,6 @@ void main() async {
   Get.put(YieldController());
   Get.put(SalesController());
   Get.put(DashboardController());
-  
 
   runApp(MyApp());
 }

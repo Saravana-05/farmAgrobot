@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../../../core/values/app_colors.dart';
 import '../../../data/models/employee/emp_model.dart';
 import '../../../data/services/employee/emp_service.dart';
 import '../../../data/services/messages/message_service.dart';
@@ -57,11 +58,34 @@ class AddEmployeeController extends GetxController {
     final DateTime? picked = await showDatePicker(
       context: Get.context!,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: kPrimaryColor,
+              onPrimary: kLightColor,
+              onSurface: kPrimaryColor,
+              outline: kPrimaryColor,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: kSecondaryColor,
+              ),
+            ),
+            dividerTheme: DividerThemeData(
+              color: kLightGreen,
+              thickness: 1,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null) {
-      joiningDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      joiningDateController.text = DateFormat('dd MMM yyyy').format(picked);
     }
   }
 
@@ -136,8 +160,8 @@ class AddEmployeeController extends GetxController {
 
     // Validate Tamil text contains valid characters
     if (!_isValidTamilText(tamilNameController.text.trim())) {
-      MessageService.to.showError('error_tamil_validation', 
-          'Tamil name contains invalid characters');
+      MessageService.to.showError(
+          'error_tamil_validation', 'Tamil name contains invalid characters');
       return false;
     }
 
@@ -173,7 +197,7 @@ class AddEmployeeController extends GetxController {
   // Helper method to validate Tamil text
   bool _isValidTamilText(String text) {
     if (text.isEmpty) return false;
-    
+
     try {
       // Try to encode the text as UTF-8 to check if it's valid
       utf8.encode(text);
@@ -279,10 +303,10 @@ class AddEmployeeController extends GetxController {
       }
     } catch (e) {
       print('Error in saveEmployee: $e');
-      
+
       // Check if it's an encoding error
       if (e.toString().contains('ascii') || e.toString().contains('encode')) {
-        MessageService.to.showError('error_tamil_encoding', 
+        MessageService.to.showError('error_tamil_encoding',
             'Tamil text encoding error. Please try typing the Tamil name again.');
       } else {
         MessageService.to.showNetworkError(

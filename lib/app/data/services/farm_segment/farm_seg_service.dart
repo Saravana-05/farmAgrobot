@@ -20,7 +20,7 @@ class FarmSegmentService {
       );
 
       final jsonResponse = json.decode(response.body);
-      
+
       return {
         'success': response.statusCode == 201,
         'statusCode': response.statusCode,
@@ -125,7 +125,8 @@ class FarmSegmentService {
   }
 
   /// Get farm segment details by ID
-  static Future<Map<String, dynamic>> getFarmSegmentById(String farmSegmentId) async {
+  static Future<Map<String, dynamic>> getFarmSegmentById(
+      String farmSegmentId) async {
     try {
       if (farmSegmentId.trim().isEmpty) {
         return {
@@ -135,7 +136,8 @@ class FarmSegmentService {
         };
       }
 
-      final uri = Uri.parse(editFarmSegmentUrl.replaceFirst('{id}', farmSegmentId));
+      final uri =
+          Uri.parse(editFarmSegmentUrl.replaceFirst('{id}', farmSegmentId));
 
       final response = await http.get(
         uri,
@@ -207,7 +209,8 @@ class FarmSegmentService {
         };
       }
 
-      final uri = Uri.parse(updateFarmSegmentUrl.replaceFirst('{id}', farmSegmentId));
+      final uri =
+          Uri.parse(updateFarmSegmentUrl.replaceFirst('{id}', farmSegmentId));
 
       final response = await http.put(
         uri,
@@ -216,7 +219,7 @@ class FarmSegmentService {
       );
 
       final jsonResponse = json.decode(response.body);
-      
+
       // Handle Django's nested response structure
       if (response.statusCode == 200 && jsonResponse['status'] == 'success') {
         return {
@@ -327,6 +330,61 @@ class FarmSegmentService {
     }
   }
 
+  static Future<Map<String, dynamic>> searchFarmSegments({
+    required String query,
+    int? page,
+    int? limit,
+  }) async {
+    try {
+      // Build query parameters
+      Map<String, dynamic> queryParams = {
+        'q': query,
+      };
+
+      if (page != null) queryParams['page'] = page.toString();
+      if (limit != null) queryParams['limit'] = limit.toString();
+
+      final uri =
+          Uri.parse(searchFarmSegmentUrl).replace(queryParameters: queryParams);
+
+      print('Searching farm segments with URL: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          // Add authentication headers if needed
+          // 'Authorization': 'Bearer ${yourToken}',
+        },
+      );
+
+      print('Search response status: ${response.statusCode}');
+      print('Search response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'success': true,
+          'data': data['data'],
+          'count': data['count'],
+          'message': data['message'],
+        };
+      } else {
+        final errorData = json.decode(response.body);
+        return {
+          'success': false,
+          'data': errorData,
+        };
+      }
+    } catch (e) {
+      print('Error searching farm segments: $e');
+      return {
+        'success': false,
+        'data': {'message': 'Error searching farm segments: ${e.toString()}'},
+      };
+    }
+  }
+
   /// Convert API response to FarmSegment model
   static FarmSegment farmSegmentFromJson(Map<String, dynamic> json) {
     return FarmSegment(
@@ -353,7 +411,8 @@ class FarmSegmentService {
 
   /// Convert list of API responses to list of FarmSegment models
   /// This method handles Django's nested response structure
-  static List<FarmSegment> farmSegmentListFromJson(Map<String, dynamic> response) {
+  static List<FarmSegment> farmSegmentListFromJson(
+      Map<String, dynamic> response) {
     if (response['status'] == 'success' && response['data'] is List) {
       final List<dynamic> jsonList = response['data'];
       return jsonList.map((json) => farmSegmentFromJson(json)).toList();
@@ -362,7 +421,8 @@ class FarmSegmentService {
   }
 
   /// Helper method to validate farm segment data before sending
-  static Map<String, String>? validateFarmSegmentData(Map<String, dynamic> farmSegmentData) {
+  static Map<String, String>? validateFarmSegmentData(
+      Map<String, dynamic> farmSegmentData) {
     Map<String, String> errors = {};
 
     // Validate farm name

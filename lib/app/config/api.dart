@@ -1,8 +1,8 @@
-const String baseUrl = 'http://192.168.0.117:8000/api/';
-const String baseImgUrl = 'http://192.168.0.117:8000';
+// const String baseUrl = 'http://192.168.0.111:8000/api/';
+// const String baseImgUrl = 'http://192.168.0.111:8000';
 
-// const String baseUrl = 'https://farmagrobot.ofal.in/api/';
-// const String baseImgUrl = 'https://farmagrobot.ofal.in/';
+const String baseUrl = 'https://farmagrobot.ofal.in/api/';
+const String baseImgUrl = 'https://farmagrobot.ofal.in/';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';
@@ -184,6 +184,7 @@ const String viewFarmSegment = baseUrl + 'farm-segments/all/';
 const String deleteFarmSegmentUrl = baseUrl + 'farm-segments/{id}/delete/';
 const String updateFarmSegmentUrl = baseUrl + 'farm-segments/{id}/update/';
 const String editFarmSegmentUrl = baseUrl + 'farm-segments/{id}/';
+const String searchFarmSegmentUrl = baseUrl + 'farm-segments/search/';
 
 // Yield URLs
 const String addYield = baseUrl + 'yields/create/';
@@ -242,5 +243,6 @@ const String dashboardRevenueByPeriodUrl = baseUrl + 'dashboard/revenue/';
 
 // Crop Dashboard API endpoints
 const String cropDashboardUrl = baseUrl + 'crop-dashboard/';
-const String cropComparisonDashboardUrl = baseUrl + 'crop-comparison-dashboard/';
+const String cropComparisonDashboardUrl =
+    baseUrl + 'crop-comparison-dashboard/';
 const String cropPerformanceMetricsUrl = baseUrl + 'crop-performance-metrics/';

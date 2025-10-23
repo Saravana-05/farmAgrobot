@@ -174,21 +174,127 @@ class FarmSegmentViewController extends GetxController {
     print('Running filter with keyword: $keyword');
     searchKeyword.value = keyword;
     currentPage.value = 1;
-    loadFarmSegments();
+
+    // If keyword is empty, load all farm segments
+    if (keyword.trim().isEmpty) {
+      loadFarmSegments();
+    } else {
+      // Use the search API
+      searchFarmSegments();
+    }
+  }
+
+  Future<void> searchFarmSegments() async {
+    try {
+      isLoading.value = true;
+
+      print('Searching farm segments with keyword: ${searchKeyword.value}');
+
+      final response = await FarmSegmentService.searchFarmSegments(
+        query: searchKeyword.value,
+        page: currentPage.value,
+        limit: itemsPerPage,
+      );
+
+      print('Search API Response: ${response}');
+
+      if (response['success'] == true) {
+        final data = response['data'];
+
+        if (data != null) {
+          List<dynamic> farmSegmentsData = [];
+
+          // Handle different API response structures
+          if (data is List) {
+            farmSegmentsData = data;
+            totalCount.value = response['count'] ?? farmSegmentsData.length;
+          } else if (data is Map) {
+            if (data.containsKey('farm_segments')) {
+              farmSegmentsData = data['farm_segments'] ?? [];
+            } else if (data.containsKey('results')) {
+              farmSegmentsData = data['results'] ?? [];
+            } else {
+              farmSegmentsData = [data];
+            }
+
+            totalCount.value = response['count'] ?? farmSegmentsData.length;
+          }
+
+          // Convert to FarmSegment objects
+          List<FarmSegment> farmSegments = [];
+          for (var farmSegmentData in farmSegmentsData) {
+            try {
+              if (farmSegmentData is Map<String, dynamic>) {
+                final farmSegment =
+                    FarmSegmentService.farmSegmentFromJson(farmSegmentData);
+                farmSegments.add(farmSegment);
+              }
+            } catch (e) {
+              print('Error parsing farm segment: $e');
+            }
+          }
+
+          filteredFarmSegments.value = farmSegments;
+          allFarmSegments.value = farmSegments;
+
+          // Update pagination
+          totalPages.value = (totalCount.value / itemsPerPage).ceil();
+          hasPrevious.value = currentPage.value > 1;
+          hasNext.value = currentPage.value < totalPages.value;
+
+          print(
+              'Search results: ${filteredFarmSegments.length} farm segments found');
+        } else {
+          filteredFarmSegments.value = [];
+          allFarmSegments.value = [];
+          totalCount.value = 0;
+        }
+      } else {
+        CustomSnackbar.showError(
+          title: 'Error',
+          message:
+              response['data']?['message'] ?? 'Failed to search farm segments',
+        );
+        filteredFarmSegments.value = [];
+        allFarmSegments.value = [];
+        totalCount.value = 0;
+      }
+    } catch (e) {
+      print('Error searching farm segments: $e');
+      CustomSnackbar.showError(
+        title: 'Error',
+        message: 'Error searching farm segments: ${e.toString()}',
+      );
+      filteredFarmSegments.value = [];
+      allFarmSegments.value = [];
+      totalCount.value = 0;
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   // Pagination
   void nextPage() {
     if (hasNext.value) {
       currentPage.value++;
-      loadFarmSegments();
+      // Use search if there's a search keyword, otherwise load all
+      if (searchKeyword.value.isNotEmpty) {
+        searchFarmSegments();
+      } else {
+        loadFarmSegments();
+      }
     }
   }
 
   void previousPage() {
     if (hasPrevious.value) {
       currentPage.value--;
-      loadFarmSegments();
+      // Use search if there's a search keyword, otherwise load all
+      if (searchKeyword.value.isNotEmpty) {
+        searchFarmSegments();
+      } else {
+        loadFarmSegments();
+      }
     }
   }
 

@@ -64,44 +64,47 @@ class EditEmployee extends StatelessWidget {
                   controller.contactController,
                   Icons.phone,
                   isNumeric: true,
+                  maxLength: 10,
                 ),
                 const SizedBox(height: 20.0),
                 _buildDateField(controller),
-                const SizedBox(height: 20.0),
-                _buildStatusDropdown(controller),
+                // const SizedBox(height: 20.0),
+                // _buildStatusDropdown(controller),
                 const SizedBox(height: 20.0),
                 _buildImagePicker(controller),
                 const SizedBox(height: 30.0),
-                Obx(() => CustomElevatedButton(
-                      text: controller.isSaving.value
-                          ? 'Updating...'
-                          : 'Update Employee',
-                      onPressed: controller.isSaving.value
-                          ? () {}
-                          : () => controller.updateEmployee(),
-                      backgroundColor: kPrimaryColor,
-                      textColor: kLightColor,
-                    )),
-                const SizedBox(height: 20.0),
-                // Cancel button
-                OutlinedButton(
-                  onPressed: () => Get.back(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: kSecondaryColor),
-                    padding: const EdgeInsets.symmetric(vertical: 15.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(50.0),
+                Row(
+                  children: [
+                    // Update Button
+                    Expanded(
+                      child: Obx(() => CustomElevatedButton(
+                            text: controller.isSaving.value
+                                ? 'Updating...'
+                                : 'Update Employee',
+                            onPressed: controller.isSaving.value
+                                ? () {}
+                                : () => controller.updateEmployee(),
+                            backgroundColor: kPrimaryColor,
+                            textColor: kLightColor,
+                          )),
                     ),
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: kSecondaryColor,
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(width: 15.0),
+                    // Cancel Icon Button
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: kPrimaryColor, width: 2),
+                      ),
+                      child: IconButton(
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.close),
+                        color: kPrimaryColor,
+                        iconSize: 28,
+                        tooltip: 'Cancel',
+                      ),
                     ),
-                  ),
-                ),
+                  ],
+                )
               ],
             ),
           ),
@@ -121,12 +124,14 @@ class EditEmployee extends StatelessWidget {
     bool isNumeric = false,
     bool isMultiline = false,
     Color iconColor = kPrimaryColor,
+    int? maxLength,
   }) {
     return TextField(
       controller: controller,
       keyboardType: isNumeric
           ? TextInputType.number
           : (isMultiline ? TextInputType.multiline : TextInputType.text),
+      maxLength: maxLength,
       maxLines: isMultiline ? null : 1,
       // Add Tamil font support like your existing code
       style: TextStyle(
@@ -249,61 +254,61 @@ class EditEmployee extends StatelessWidget {
         ));
   }
 
-  Widget _buildStatusDropdown(EditEmployeeController controller) {
-    return Obx(() => DropdownButtonFormField<bool>(
-          value: controller.selectedStatus.value,
-          onChanged: (bool? newValue) {
-            controller.selectedStatus.value = newValue ?? true;
-          },
-          items: const [
-            DropdownMenuItem<bool>(
-              value: true,
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 20),
-                  SizedBox(width: 8),
-                  Text('Active'),
-                ],
-              ),
-            ),
-            DropdownMenuItem<bool>(
-              value: false,
-              child: Row(
-                children: [
-                  Icon(Icons.cancel, color: Colors.red, size: 20),
-                  SizedBox(width: 8),
-                  Text('Inactive'),
-                ],
-              ),
-            ),
-          ],
-          decoration: InputDecoration(
-            labelText: 'Status',
-            prefixIcon: Icon(
-              controller.selectedStatus.value
-                  ? Icons.toggle_on
-                  : Icons.toggle_off,
-              color:
-                  controller.selectedStatus.value ? Colors.green : Colors.red,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(50.0),
-              borderSide: const BorderSide(color: kSecondaryColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(50.0),
-              borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(50.0),
-              borderSide: const BorderSide(color: kSecondaryColor),
-            ),
-            labelStyle: const TextStyle(color: kSecondaryColor),
-            filled: true,
-            fillColor: Colors.grey[50],
-          ),
-        ));
-  }
+  // Widget _buildStatusDropdown(EditEmployeeController controller) {
+  //   return Obx(() => DropdownButtonFormField<bool>(
+  //         value: controller.selectedStatus.value,
+  //         onChanged: (bool? newValue) {
+  //           controller.selectedStatus.value = newValue ?? true;
+  //         },
+  //         items: const [
+  //           DropdownMenuItem<bool>(
+  //             value: true,
+  //             child: Row(
+  //               children: [
+  //                 Icon(Icons.check_circle, color: Colors.green, size: 20),
+  //                 SizedBox(width: 8),
+  //                 Text('Active'),
+  //               ],
+  //             ),
+  //           ),
+  //           DropdownMenuItem<bool>(
+  //             value: false,
+  //             child: Row(
+  //               children: [
+  //                 Icon(Icons.cancel, color: Colors.red, size: 20),
+  //                 SizedBox(width: 8),
+  //                 Text('Inactive'),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //         decoration: InputDecoration(
+  //           labelText: 'Status',
+  //           prefixIcon: Icon(
+  //             controller.selectedStatus.value
+  //                 ? Icons.toggle_on
+  //                 : Icons.toggle_off,
+  //             color:
+  //                 controller.selectedStatus.value ? Colors.green : Colors.red,
+  //           ),
+  //           border: OutlineInputBorder(
+  //             borderRadius: BorderRadius.circular(50.0),
+  //             borderSide: const BorderSide(color: kSecondaryColor),
+  //           ),
+  //           focusedBorder: OutlineInputBorder(
+  //             borderRadius: BorderRadius.circular(50.0),
+  //             borderSide: const BorderSide(color: kPrimaryColor, width: 2.0),
+  //           ),
+  //           enabledBorder: OutlineInputBorder(
+  //             borderRadius: BorderRadius.circular(50.0),
+  //             borderSide: const BorderSide(color: kSecondaryColor),
+  //           ),
+  //           labelStyle: const TextStyle(color: kSecondaryColor),
+  //           filled: true,
+  //           fillColor: Colors.grey[50],
+  //         ),
+  //       ));
+  // }
 
   Widget _buildImagePicker(EditEmployeeController controller) {
     return Column(
@@ -354,7 +359,6 @@ class EditEmployee extends StatelessWidget {
                             ),
                           ),
                         ),
-                      
                     ],
                   ),
                 ),
