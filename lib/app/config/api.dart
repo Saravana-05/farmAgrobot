@@ -2,7 +2,7 @@
 // const String baseImgUrl = 'http://192.168.0.111:8000';
 
 const String baseUrl = 'https://farmagrobot.ofal.in/api/';
-const String baseImgUrl = 'https://farmagrobot.ofal.in/';
+const String baseImgUrl = 'https://farmagrobot.ofal.in';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';

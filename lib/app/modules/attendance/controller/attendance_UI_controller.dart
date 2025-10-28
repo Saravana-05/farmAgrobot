@@ -15,6 +15,10 @@ class AttendanceUIController extends GetxController {
   var attendanceRecords = <String, Map<DateTime, int>>{}.obs;
   var selectedWeekStart = DateTime.now().obs;
 
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
   // Loading states
   var isLoading = false.obs;
   var isExporting = false.obs;
@@ -48,6 +52,10 @@ class AttendanceUIController extends GetxController {
 
   var isPdfGenerating = false.obs;
 
+  // NEW: Queue for batch API updates
+  final Map<String, Map<DateTime, int>> _pendingUpdates = {};
+  bool _isSyncingBatch = false;
+
   @override
   void onInit() {
     super.onInit();
@@ -73,7 +81,6 @@ class AttendanceUIController extends GetxController {
 
   Future<void> fetchWeeklyData() async {
     if (isLoading.value) return;
-
     isLoading.value = true;
 
     try {
@@ -83,24 +90,19 @@ class AttendanceUIController extends GetxController {
         weekStart: selectedWeekStart.value,
       );
 
-      print('=== CONTROLLER DEBUG ===');
-      print('Response success: ${response['success']}');
-
       if (response['success'] == true && response['data'] != null) {
-        print('API call successful, processing data...');
-
         final rawData = response['data'];
         final weeklyDataModel = WeeklyData.fromJson(rawData);
 
         weeklyData.value = weeklyDataModel;
         await _processWeeklyData(weeklyDataModel);
-
-        // CRITICAL: Ensure UI updates after processing
         _refreshPaymentUI();
 
-        _showSuccessMessage('Weekly data loaded successfully');
+        // Extract and show success message
+        String successMsg =
+            _extractSuccessMessage(response, 'Weekly data loaded successfully');
+        _showSuccessMessage(successMsg);
       } else {
-        print('API Error Response: $response');
         _handleApiError(response);
       }
     } catch (e, stackTrace) {
@@ -113,34 +115,35 @@ class AttendanceUIController extends GetxController {
   }
 
   /// Process weekly data and update local state
-  /// Process weekly data and update local state
   Future<void> _processWeeklyData(WeeklyData data) async {
+    print('=== STARTING DATA PROCESSING ===');
+    print('Total employees from API: ${data.employees.length}');
+
     _clearLocalData();
 
     Map<String, EmployeeAttendanceRecord> employeeMap = {};
+    int processedCount = 0;
+    int skippedCount = 0;
 
-    // Process employees from the weekly data response
+    // NEW: Map to track daily attendance counts
+    Map<DateTime, Set<String>> dailyAttendanceTracker = {};
+
+    // STEP 1: Process each employee
     for (int i = 0; i < data.employees.length; i++) {
       try {
         var empData = data.employees[i];
-        
-        print('Processing employee $i: ${empData.employeeId}');
-        print('Employee data type check:');
-        print('  employeeId: ${empData.employeeId.runtimeType}');
-        print('  employeeName: ${empData.employeeName.runtimeType}');
-        print('  dailyWage: ${empData.dailyWage.runtimeType}');
-        print('  attendance: ${empData.attendance.runtimeType}');
 
-        // Create employee record with validation
         final employeeId = empData.employeeId?.toString() ?? '';
         final employeeName = empData.employeeName?.toString() ?? 'Unknown';
         final dailyWage = _parseDouble(empData.dailyWage) ?? 0.0;
 
         if (employeeId.isEmpty) {
-          print('Warning: Empty employee ID for employee at index $i, skipping');
+          print('⚠️ Warning: Empty employee ID at index $i, skipping');
+          skippedCount++;
           continue;
         }
 
+        // Create employee record
         employeeMap[employeeId] = EmployeeAttendanceRecord(
           id: employeeId,
           name: employeeName,
@@ -148,107 +151,332 @@ class AttendanceUIController extends GetxController {
           hasWage: true,
         );
 
-        // Store attendance records with proper parsing
+        // Initialize attendance records
         attendanceRecords[employeeId] = {};
-        
-        // Handle attendance data safely
-        if (empData.attendance != null) {
-          if (empData.attendance is Map) {
-            final attendanceMap = empData.attendance as Map;
-            attendanceMap.forEach((key, value) {
-              final dateString = key.toString();
-              final date = DateTime.tryParse(dateString);
-              
-              if (date != null) {
-                // Parse status value safely
-                int? status;
-                if (value is int) {
-                  status = value;
-                } else if (value is String) {
-                  status = int.tryParse(value);
-                } else if (value is double) {
-                  status = value.toInt();
-                } else {
-                  // print('Warning: Unknown attendance status type for $employeeId on $dateString: ${value.runtimeType}');
-                  // continue;
+
+        // Process attendance
+        if (empData.attendance != null && empData.attendance is Map) {
+          final attendanceMap = empData.attendance as Map;
+          attendanceMap.forEach((key, value) {
+            final dateString = key.toString();
+            final date = DateTime.tryParse(dateString);
+
+            if (date != null && value != null) {
+              int? status;
+
+              // Handle different value types
+              if (value is int) {
+                status = value;
+              } else if (value is String) {
+                status = int.tryParse(value);
+              } else if (value is double) {
+                status = value.toInt();
+              } else if (value is Map) {
+                final statusValue = value['status'];
+                if (statusValue is int) {
+                  status = statusValue;
+                } else if (statusValue is String) {
+                  status = int.tryParse(statusValue);
+                } else if (statusValue is double) {
+                  status = statusValue.toInt();
                 }
-                
-                if (status != null && [0, 1, 2, 3].contains(status)) {
-                  attendanceRecords[employeeId]![date] = status;
-                } else {
-                  print('Warning: Invalid attendance status $status for $employeeId on $dateString');
-                }
-              } else {
-                print('Warning: Invalid date format $dateString for employee $employeeId');
               }
-            });
-          } else {
-            print('Warning: Expected Map for attendance data, got ${empData.attendance.runtimeType}');
-          }
+
+              if (status != null && [0, 1, 2, 3].contains(status)) {
+                attendanceRecords[employeeId]![date] = status;
+
+                // NEW: Track daily attendance (count only Present, Half Day, Late)
+                if (status == 1 || status == 2 || status == 3) {
+                  if (!dailyAttendanceTracker.containsKey(date)) {
+                    dailyAttendanceTracker[date] = {};
+                  }
+                  dailyAttendanceTracker[date]!.add(employeeId);
+                }
+              }
+            }
+          });
         }
 
-        // Store payment information with safe parsing and validation
+        // Extract payment data from API response
         final paymentStatus = empData.paymentStatus?.toString() ?? 'pending';
         final partialPayment = _parseDouble(empData.partialPayment) ?? 0.0;
         final remainingAmount = _parseDouble(empData.remainingAmount) ?? 0.0;
 
+        // Store payment data
         employeePaymentStatus[employeeId] = paymentStatus;
         employeePartialPayments[employeeId] = partialPayment;
         employeeRemainingAmounts[employeeId] = remainingAmount;
 
-        print('Successfully processed employee payment data:');
-        print('  ID: $employeeId');
-        print('  Name: $employeeName');
-        print('  Daily Wage: $dailyWage');
-        print('  Payment Status: $paymentStatus');
-        print('  Partial Payment: $partialPayment');
-        print('  Remaining Amount: $remainingAmount');
-        print('  Attendance Records: ${attendanceRecords[employeeId]?.length ?? 0}');
-
+        print(
+            '✅ [$i] ${employeeName}: Status=$paymentStatus, Paid=₹$partialPayment, Remaining=₹$remainingAmount');
+        processedCount++;
       } catch (e, stackTrace) {
-        print('Error processing employee $i: $e');
+        print('❌ Error processing employee $i: $e');
         print('Stack trace: $stackTrace');
-        print('Employee data: ${data.employees[i]}');
-        
-        // Continue processing other employees instead of failing completely
+        skippedCount++;
         continue;
       }
     }
 
-    // Handle case where no employees in weekly data
+    print(
+        'Processing Summary: Processed=$processedCount, Skipped=$skippedCount');
+
+    // STEP 2: Fallback if no employees
     if (employeeMap.isEmpty) {
+      print('⚠️ No employees processed, loading fallback...');
       await _loadActiveEmployeesAsFallback(employeeMap);
     }
 
-    // Convert map back to list
+    // STEP 3: Set employees list
     employees.value = employeeMap.values.toList();
+    print('Total employees in list: ${employees.length}');
 
-    // Ensure all employees have initialized payment data
-    _ensurePaymentDataInitialized();
-
-    // Apply employee ordering
+    // STEP 4: Apply ordering
     _applyEmployeeOrdering();
 
-    // Set wage information
+    // STEP 5: Set totals and counts
     grandTotalWages.value = data.totalWages;
-    wagesPaid.value = data.wagesPaid;
 
-    // Calculate counts
-    _calculateEmployeeCounts(data);
+    // NEW: Calculate daily employee counts from tracked attendance
+    _calculateDailyEmployeeCounts(dailyAttendanceTracker, data);
 
+    // STEP 6: Validate consistency
+    _validateAllPaymentData();
+    _recalculateWageSummary();
+
+    // STEP 7: Print final summary
     print('=== PROCESSING COMPLETE ===');
     print('Final employees count: ${employees.length}');
-    print('Employees processed: ${employees.map((e) => '${e.id}:${e.name}').join(', ')}');
+    print('Total wages: ₹${grandTotalWages.value}');
+    print('Total paid: ₹${getTotalPaidAmount()}');
+    print('Total remaining: ₹${getTotalRemainingAmount()}');
+    print('Wages fully paid: ${wagesPaid.value}');
+    print('Daily counts: ${dailyEmployeeCount.length} days tracked');
+
+    // Print payment status breakdown
+    final statusCounts = getPaymentStatusCounts();
+    print(
+        'Payment breakdown: Paid=${statusCounts['paid']}, Partial=${statusCounts['partial']}, Pending=${statusCounts['pending']}');
+  }
+
+  void _calculateDailyEmployeeCounts(
+      Map<DateTime, Set<String>> dailyAttendanceTracker, WeeklyData data) {
+    dailyEmployeeCount.clear();
+
+    // Option 1: Use API data if available
+    if (data.dailyCounts.isNotEmpty) {
+      print('Using daily counts from API');
+      data.dailyCounts.forEach((dateString, count) {
+        final date = DateTime.tryParse(dateString);
+        if (date != null) {
+          // ✅ CRITICAL: Normalize the date before storing
+          final normalizedDate = _normalizeDate(date);
+          dailyEmployeeCount[normalizedDate] = count;
+          print(
+              '  ${DateFormat('dd/MM').format(normalizedDate)}: $count employees (stored with key: $normalizedDate)');
+        }
+      });
+    }
+    // Option 2: Calculate from local attendance data
+    else {
+      print('Calculating daily counts from attendance data');
+      dailyAttendanceTracker.forEach((date, employeeIds) {
+        // ✅ CRITICAL: Normalize the date before storing
+        final normalizedDate = _normalizeDate(date);
+        dailyEmployeeCount[normalizedDate] = employeeIds.length;
+        print(
+            '  ${DateFormat('dd/MM').format(normalizedDate)}: ${employeeIds.length} employees');
+      });
+    }
+
+    // Set weekly employee count
+    if (data.weeklyEmployeeCount > 0) {
+      weeklyEmployeeCount.value = data.weeklyEmployeeCount;
+    } else {
+      Set<String> uniqueEmployees = {};
+      dailyAttendanceTracker.values.forEach((employeeIds) {
+        uniqueEmployees.addAll(employeeIds);
+      });
+      weeklyEmployeeCount.value = uniqueEmployees.length;
+    }
+
+    print('Weekly employee count: ${weeklyEmployeeCount.value}');
+    print('Daily count map keys: ${dailyEmployeeCount.keys.toList()}');
+
+    // ✅ Force UI update
+    dailyEmployeeCount.refresh();
+  }
+
+  void _recalculateDailyCountsFromRecords() {
+    dailyEmployeeCount.clear();
+
+    // For each employee's attendance records
+    attendanceRecords.forEach((employeeId, attendanceMap) {
+      attendanceMap.forEach((date, status) {
+        // Count only Present (1), Half Day (2), and Late (3)
+        if (status == 1 || status == 2 || status == 3) {
+          // ✅ Date is already normalized in attendanceRecords
+          dailyEmployeeCount[date] = (dailyEmployeeCount[date] ?? 0) + 1;
+        }
+      });
+    });
+
+    // Calculate unique employees for the week
+    Set<String> uniqueEmployees = {};
+    attendanceRecords.forEach((employeeId, attendanceMap) {
+      if (attendanceMap.values
+          .any((status) => status == 1 || status == 2 || status == 3)) {
+        uniqueEmployees.add(employeeId);
+      }
+    });
+    weeklyEmployeeCount.value = uniqueEmployees.length;
+
+    print('Recalculated ${dailyEmployeeCount.length} daily counts');
+    print(
+        'Daily count map keys after recalc: ${dailyEmployeeCount.keys.toList()}');
+
+    // ✅ Force UI update
+    dailyEmployeeCount.refresh();
+  }
+
+// Fix getDailyEmployeeCount helper
+  int getDailyEmployeeCount(DateTime date) {
+    final normalizedDate = _normalizeDate(date);
+    final count = dailyEmployeeCount[normalizedDate] ?? 0;
+    print(
+        'getDailyEmployeeCount for ${DateFormat('dd/MM').format(date)}: $count (key: $normalizedDate)');
+    return count;
+  }
+
+  int getDailyEmployeeCountSafe(DateTime date) {
+    final normalizedDate = _normalizeDate(date);
+    final count = dailyEmployeeCount[normalizedDate] ?? 0;
+    print(
+        'getDailyEmployeeCountSafe for ${DateFormat('dd/MM/yyyy').format(date)}: $count (key: $normalizedDate)');
+    return count;
+  }
+
+  void debugDailyCountKeys() {
+    print('=== DEBUG DAILY COUNT KEYS ===');
+    print('Total entries in dailyEmployeeCount: ${dailyEmployeeCount.length}');
+    dailyEmployeeCount.forEach((date, count) {
+      print(
+          '  Key: $date (${date.hour}:${date.minute}:${date.second}) -> Count: $count');
+    });
+
+    print('\n=== CHECKING UI DATE KEYS ===');
+    final daysOfWeek = List.generate(
+        7, (index) => selectedWeekStart.value.add(Duration(days: index)));
+    for (var date in daysOfWeek) {
+      final normalized = _normalizeDate(date);
+      final count = dailyEmployeeCount[normalized];
+      print('  UI date: $normalized -> Count: $count');
+    }
+    print('================================');
+  }
+
+  Map<String, int> getDailyAttendanceBreakdown(DateTime date) {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    int present = 0;
+    int halfDay = 0;
+    int late = 0;
+    int absent = 0;
+
+    attendanceRecords.forEach((employeeId, attendanceMap) {
+      final status = attendanceMap[normalizedDate];
+      if (status != null) {
+        switch (status) {
+          case 1:
+            present++;
+            break;
+          case 2:
+            halfDay++;
+            break;
+          case 3:
+            late++;
+            break;
+          case 0:
+            absent++;
+            break;
+        }
+      }
+    });
+
+    return {
+      'present': present,
+      'halfDay': halfDay,
+      'late': late,
+      'absent': absent,
+      'total': present + halfDay + late,
+    };
+  }
+
+  /// Force recalculate all daily counts (call after bulk updates)
+  void recalculateDailyCounts() {
+    print('🔄 Force recalculating daily counts...');
+    _recalculateDailyCountsFromRecords();
+    dailyEmployeeCount.refresh();
+    print('✅ Daily counts refreshed');
+  }
+
+  /// NEW: Validate payment data without overwriting API values
+  void _validateAllPaymentData() {
+    print('=== VALIDATING PAYMENT DATA ===');
+
+    for (var employee in employees) {
+      final employeeId = employee.id;
+
+      // Ensure records exist (but DON'T overwrite if they already have values)
+      if (!employeePaymentStatus.containsKey(employeeId)) {
+        employeePaymentStatus[employeeId] = 'pending';
+        print('⚠️ ${employee.name}: No payment status, set to pending');
+      }
+
+      if (!employeePartialPayments.containsKey(employeeId)) {
+        employeePartialPayments[employeeId] = 0.0;
+        print('⚠️ ${employee.name}: No partial payment, set to 0');
+      }
+
+      if (!employeeRemainingAmounts.containsKey(employeeId)) {
+        final totalWages = getTotalWages(employeeId);
+        final partialPayment = employeePartialPayments[employeeId] ?? 0.0;
+        employeeRemainingAmounts[employeeId] = totalWages - partialPayment;
+        print(
+            '⚠️ ${employee.name}: Calculated remaining amount = ₹${employeeRemainingAmounts[employeeId]}');
+      }
+
+      if (!attendanceRecords.containsKey(employeeId)) {
+        attendanceRecords[employeeId] = {};
+      }
+
+      // Validate consistency (fix only if clearly wrong)
+      final status = employeePaymentStatus[employeeId]!;
+      final paid = employeePartialPayments[employeeId]!;
+      final remaining = employeeRemainingAmounts[employeeId]!;
+      final total = getTotalWages(employeeId);
+
+      // Check for inconsistencies
+      if (status == 'paid' && remaining > 0.01) {
+        print(
+            '⚠️ ${employee.name}: Status is paid but has remaining ₹$remaining - fixing');
+        employeeRemainingAmounts[employeeId] = 0.0;
+        employeePartialPayments[employeeId] = total;
+      } else if (status == 'pending' && paid > 0.01) {
+        print(
+            '⚠️ ${employee.name}: Status is pending but has payment ₹$paid - fixing to partial');
+        employeePaymentStatus[employeeId] = 'partial';
+      }
+    }
+
+    print('✅ Payment data validation complete');
   }
 
   /// Helper method to safely parse double values
   double? _parseDouble(dynamic value) {
     if (value == null) return null;
-    
     if (value is double) return value;
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value);
-    
     print('Warning: Cannot parse double from ${value.runtimeType}: $value');
     return null;
   }
@@ -256,33 +484,27 @@ class AttendanceUIController extends GetxController {
   /// Enhanced method to ensure payment data is initialized for all employees
   void _ensurePaymentDataInitialized() {
     for (var employee in employees) {
-      // Initialize payment status if not exists
+      final totalWages = getTotalWages(employee.id);
+
       if (!employeePaymentStatus.containsKey(employee.id)) {
-        employeePaymentStatus[employee.id] = 'pending';
-        print('Initialized payment status for ${employee.id}: pending');
+        employeePaymentStatus[employee.id] =
+            totalWages > 0 ? 'pending' : 'pending';
       }
 
-      // Initialize partial payment if not exists
       if (!employeePartialPayments.containsKey(employee.id)) {
         employeePartialPayments[employee.id] = 0.0;
-        print('Initialized partial payment for ${employee.id}: 0.0');
       }
 
-      // Initialize or calculate remaining amount
       if (!employeeRemainingAmounts.containsKey(employee.id)) {
-        final totalWages = getTotalWages(employee.id);
         final partialPayment = employeePartialPayments[employee.id] ?? 0.0;
-        employeeRemainingAmounts[employee.id] = totalWages - partialPayment;
-        print('Calculated remaining amount for ${employee.id}: ${employeeRemainingAmounts[employee.id]}');
+        final remaining = totalWages - partialPayment;
+        employeeRemainingAmounts[employee.id] = remaining > 0 ? remaining : 0.0;
       }
 
-      // Initialize attendance records if not exists
       if (!attendanceRecords.containsKey(employee.id)) {
         attendanceRecords[employee.id] = {};
-        print('Initialized attendance records for ${employee.id}');
       }
 
-      // Validate payment data consistency
       _validatePaymentDataConsistency(employee.id);
     }
   }
@@ -294,32 +516,28 @@ class AttendanceUIController extends GetxController {
     final remainingAmount = employeeRemainingAmounts[employeeId] ?? 0.0;
     final paymentStatus = employeePaymentStatus[employeeId] ?? 'pending';
 
-    // Check if calculations are consistent
     final expectedRemaining = totalWages - partialPayment;
-    
+
     if ((expectedRemaining - remainingAmount).abs() > 0.01) {
-      print('Warning: Payment data inconsistency for $employeeId');
-      print('  Total Wages: $totalWages');
-      print('  Partial Payment: $partialPayment');
-      print('  Stored Remaining: $remainingAmount');
-      print('  Expected Remaining: $expectedRemaining');
-      
-      // Auto-correct the remaining amount
-      employeeRemainingAmounts[employeeId] = expectedRemaining > 0 ? expectedRemaining : 0.0;
+      employeeRemainingAmounts[employeeId] =
+          expectedRemaining > 0 ? expectedRemaining : 0.0;
     }
 
-    // Check if status matches payment amounts
-    if (partialPayment >= totalWages && paymentStatus != 'paid') {
-      print('Auto-correcting payment status for $employeeId from $paymentStatus to paid');
+    if (totalWages > 0 &&
+        partialPayment >= totalWages &&
+        paymentStatus != 'paid') {
       employeePaymentStatus[employeeId] = 'paid';
       employeeRemainingAmounts[employeeId] = 0.0;
-    } else if (partialPayment > 0 && partialPayment < totalWages && paymentStatus == 'pending') {
-      print('Auto-correcting payment status for $employeeId from $paymentStatus to partial');
+    } else if (totalWages == 0) {
+      employeePaymentStatus[employeeId] = 'pending';
+      employeePartialPayments[employeeId] = 0.0;
+      employeeRemainingAmounts[employeeId] = 0.0;
+    } else if (partialPayment > 0 &&
+        partialPayment < totalWages &&
+        paymentStatus != 'partial') {
       employeePaymentStatus[employeeId] = 'partial';
     }
   }
-
-  
 
   /// NEW METHOD: Load active employees as fallback
   Future<void> _loadActiveEmployeesAsFallback(
@@ -343,8 +561,6 @@ class AttendanceUIController extends GetxController {
             );
 
             employeeMap[employee.id] = employee;
-
-            // Initialize payment data for fallback employees
             employeePaymentStatus[employeeId] = 'pending';
             employeePartialPayments[employeeId] = 0.0;
             employeeRemainingAmounts[employeeId] = 0.0;
@@ -364,13 +580,11 @@ class AttendanceUIController extends GetxController {
       final response = await AttendanceService.getActiveEmployees();
 
       if (response['success'] == true && response['data'] != null) {
-        // FIXED: Use the corrected parsing method
         final employeeList =
             AttendanceService.employeeListFromJson(response['data']);
         employees.value = employeeList;
         _applyEmployeeOrdering();
         _showSuccessMessage('Active employees loaded successfully');
-
         print('Fetched ${employeeList.length} active employees');
       } else {
         _handleApiError(response);
@@ -378,6 +592,184 @@ class AttendanceUIController extends GetxController {
     } catch (e) {
       _handleException('Failed to fetch active employees', e);
     }
+  }
+
+  // NEW: ULTRA-FAST ATTENDANCE UPDATE METHOD
+  /// Update attendance instantly in UI, sync to backend asynchronously
+  void updateAttendanceInstant(
+      String employeeId, String employeeName, DateTime date, int status) {
+    // Validation checks
+    if (employeeId.isEmpty ||
+        employeeName.isEmpty ||
+        ![0, 1, 2, 3].contains(status)) {
+      return;
+    }
+
+    if (_checkWagesPaidRestriction()) return;
+
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+
+    // STEP 1: Update UI immediately (no waiting)
+    _updateLocalAttendanceInstant(employeeId, normalizedDate, status);
+
+    // ✅ Recalculate daily counts immediately
+    _recalculateDailyCountsFromRecords();
+
+    // STEP 2: Queue the update for backend sync
+    _queueBackendUpdate(employeeId, employeeName, normalizedDate, status);
+
+    // STEP 3: Recalculate wages immediately for instant UI feedback
+    _recalculateEmployeeWages(employeeId);
+  }
+
+  /// Update local attendance instantly without any delay
+  void _updateLocalAttendanceInstant(
+      String employeeId, DateTime date, int status) {
+    // Ensure attendance record exists
+    if (!attendanceRecords.containsKey(employeeId)) {
+      attendanceRecords[employeeId] = {};
+    }
+
+    // Update the record
+    attendanceRecords[employeeId]![date] = status;
+
+    // Force UI refresh
+    attendanceRecords.refresh();
+  }
+
+  /// Queue backend update for batch processing
+  void _queueBackendUpdate(
+      String employeeId, String employeeName, DateTime date, int status) {
+    // Add to pending updates
+    if (!_pendingUpdates.containsKey(employeeId)) {
+      _pendingUpdates[employeeId] = {};
+    }
+    _pendingUpdates[employeeId]![date] = status;
+
+    // Trigger batch sync after a short delay (debounce)
+    _debouncedBatchSync(employeeId, employeeName);
+  }
+
+  /// Debounced batch sync to avoid too many API calls
+  void _debouncedBatchSync(String employeeId, String employeeName) async {
+    // Wait for 500ms to batch multiple rapid changes
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (_isSyncingBatch) return;
+    _isSyncingBatch = true;
+
+    try {
+      // Get all pending updates for this employee
+      final updates = _pendingUpdates[employeeId];
+      if (updates == null || updates.isEmpty) {
+        _isSyncingBatch = false;
+        return;
+      }
+
+      // Sync each update to backend
+      for (var entry in updates.entries) {
+        await _syncToBackend(employeeId, employeeName, entry.key, entry.value);
+      }
+
+      // Clear pending updates for this employee
+      _pendingUpdates.remove(employeeId);
+    } catch (e) {
+      print('Error in batch sync: $e');
+    } finally {
+      _isSyncingBatch = false;
+    }
+  }
+
+  /// Sync single attendance update to backend
+  Future<void> _syncToBackend(
+      String employeeId, String employeeName, DateTime date, int status) async {
+    try {
+      final response = await AttendanceService.updateSingleAttendance(
+        employeeId: employeeId,
+        employeeName: employeeName,
+        date: date,
+        status: status,
+      );
+
+      if (response['success'] == true) {
+        print(
+            '✓ Synced: $employeeName - ${DateFormat('dd/MM').format(date)} - Status: $status');
+
+        // Show success message if available
+        String successMsg = _extractSuccessMessage(response, '');
+        if (successMsg.isNotEmpty) {
+          print('Backend message: $successMsg');
+        }
+      } else {
+        print(
+            '✗ Sync failed: $employeeName - ${DateFormat('dd/MM').format(date)}');
+
+        // Extract error message using helper method
+        String errorMessage =
+            _extractErrorMessage(response, 'Failed to update attendance');
+
+        // Revert local change with backend error message
+        _revertLocalAttendance(employeeId, date, errorMessage);
+      }
+    } catch (e) {
+      print('✗ Sync error: $e');
+
+      // Revert with exception message
+      String errorMessage = 'Network error: ${e.toString()}';
+      if (e.toString().contains('SocketException')) {
+        errorMessage = 'No internet connection. Please check your network.';
+      } else if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'Request timeout. Please try again.';
+      }
+
+      _revertLocalAttendance(employeeId, date, errorMessage);
+    }
+  }
+
+  /// Revert local attendance if backend sync fails
+  void _revertLocalAttendance(String employeeId, DateTime date,
+      [String? errorMessage]) {
+    // Remove the failed update
+    if (attendanceRecords.containsKey(employeeId)) {
+      attendanceRecords[employeeId]!.remove(date);
+      attendanceRecords.refresh();
+    }
+
+    // Recalculate daily counts after reverting
+    _recalculateDailyCountsFromRecords();
+
+    // Show backend error message or fallback
+    final displayMessage =
+        errorMessage ?? 'Failed to update attendance. Please try again.';
+    _showErrorMessage(displayMessage);
+  }
+
+  /// Recalculate wages for a specific employee instantly
+  void _recalculateEmployeeWages(String employeeId) {
+    final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
+    if (employee == null) return;
+
+    // This will trigger UI update for wages column
+    employees.refresh();
+
+    // Recalculate grand total
+    _recalculateGrandTotal();
+  }
+
+  /// Recalculate grand total wages
+  void _recalculateGrandTotal() {
+    double total = 0.0;
+    for (var employee in employees) {
+      total += getTotalWages(employee.id);
+    }
+    grandTotalWages.value = total;
+  }
+
+  // Keep original method for backwards compatibility
+  Future<void> updateAttendance(
+      String employeeId, String employeeName, DateTime date, int status) async {
+    // Just call the instant version
+    updateAttendanceInstant(employeeId, employeeName, date, status);
   }
 
   /// Fetch attendance statistics
@@ -390,7 +782,6 @@ class AttendanceUIController extends GetxController {
       );
 
       if (response['success'] == true && response['data'] != null) {
-        // Process attendance statistics (implement based on your model)
         _showSuccessMessage('Statistics loaded successfully');
       } else {
         _handleApiError(response);
@@ -400,99 +791,14 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Update single employee attendance
-  Future<void> updateAttendance(
-    String employeeId,
-    String employeeName,
-    DateTime date,
-    int status,
-  ) async {
-    // Validation checks
-    if (employeeId.isEmpty) {
-      _showErrorMessage('Employee ID cannot be empty');
-      return;
-    }
-
-    if (employeeName.isEmpty) {
-      _showErrorMessage('Employee name cannot be empty');
-      return;
-    }
-
-    if (![0, 1, 2, 3].contains(status)) {
-      _showErrorMessage('Invalid attendance status: $status');
-      return;
-    }
-
-    if (_checkWagesPaidRestriction()) return;
-    if (isUpdatingAttendance.value) return;
-
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    isUpdatingAttendance.value = true;
-
-    try {
-      print('Updating attendance for:');
-      print('  Employee ID: $employeeId');
-      print('  Employee Name: $employeeName');
-      print('  Date: $normalizedDate');
-      print('  Status: $status');
-
-      final response = await AttendanceService.updateSingleAttendance(
-        employeeId: employeeId,
-        employeeName: employeeName,
-        date: normalizedDate,
-        status: status,
-      );
-
-      print('API Response: $response');
-
-      if (response['success'] == true) {
-        // Success case
-        _updateLocalAttendance(employeeId, normalizedDate, status);
-        await fetchWeeklyData();
-
-        final successMessage =
-            response['data']['message'] ?? 'Attendance updated successfully';
-        _showSuccessMessage(successMessage);
-      } else {
-        // Handle API errors (400, 404, etc.)
-        final responseData = response['data'] ?? {};
-
-        // Extract error message from API response
-        String errorMessage = responseData['error'] ??
-            responseData['message'] ??
-            'Failed to update attendance';
-
-        // Add status code context for debugging if needed
-        final statusCode = response['statusCode'];
-        if (statusCode != null && statusCode >= 500) {
-          errorMessage = 'Server error occurred. Please try again later.';
-        }
-
-        _showErrorMessage(errorMessage);
-      }
-    } catch (e) {
-      print('Error in updateAttendance: $e');
-
-      // This catch block should now only handle unexpected errors
-      // since network/timeout errors are already handled in the service
-      _showErrorMessage('An unexpected error occurred. Please try again.');
-    } finally {
-      isUpdatingAttendance.value = false;
-    }
-  }
-
   /// Mark attendance for multiple employees on a specific date
   Future<void> markAttendanceForDate(
-    DateTime date,
-    List<EmployeeAttendance> employeeAttendances,
-  ) async {
-    // Validation
+      DateTime date, List<EmployeeAttendance> employeeAttendances) async {
     if (employeeAttendances.isEmpty) {
       _showErrorMessage('No attendance data to mark');
       return;
     }
 
-    // Validate each attendance entry
     for (var attendance in employeeAttendances) {
       if (attendance.employeeId.isEmpty) {
         _showErrorMessage('Invalid employee data found');
@@ -511,36 +817,35 @@ class AttendanceUIController extends GetxController {
     isUpdatingAttendance.value = true;
 
     try {
-      print(
-          'Marking attendance for ${employeeAttendances.length} employees on $date');
-
       final response = await AttendanceService.markAttendance(
         date: date,
         employeeAttendances: employeeAttendances,
       );
 
       if (response != null && response['success'] == true) {
-        // Update local state for all employees
+        // Update local attendance
         for (var attendance in employeeAttendances) {
           _updateLocalAttendance(
               attendance.employeeId, date, attendance.status);
         }
 
         await fetchWeeklyData();
-        _showSuccessMessage(
-            response['data']?['message'] ?? 'Attendance marked successfully');
+
+        // Extract and show backend success message
+        String successMessage =
+            _extractSuccessMessage(response, 'Attendance marked successfully');
+        _showSuccessMessage(successMessage);
       } else {
         if (response == null) {
           throw Exception('No response received from server');
         } else {
-          final errorMessage = response['data']?['message'] ??
-              response['error'] ??
-              'Failed to mark attendance';
+          // Use helper method to extract error
+          String errorMessage =
+              _extractErrorMessage(response, 'Failed to mark attendance');
           throw Exception(errorMessage);
         }
       }
     } catch (e) {
-      print('Error in markAttendanceForDate: $e');
       _handleException('Failed to mark attendance', e);
     } finally {
       isUpdatingAttendance.value = false;
@@ -549,9 +854,7 @@ class AttendanceUIController extends GetxController {
 
   /// Update attendance for multiple employees
   Future<void> updateAttendanceForDate(
-    DateTime date,
-    List<EmployeeAttendance> employeeAttendances,
-  ) async {
+      DateTime date, List<EmployeeAttendance> employeeAttendances) async {
     if (_checkWagesPaidRestriction()) return;
     if (isUpdatingAttendance.value) return;
 
@@ -565,8 +868,11 @@ class AttendanceUIController extends GetxController {
 
       if (response['success'] == true) {
         await fetchWeeklyData();
-        _showSuccessMessage(
-            response['data']['message'] ?? 'Attendance updated successfully');
+
+        // Extract and show backend success message
+        String successMessage =
+            _extractSuccessMessage(response, 'Attendance updated successfully');
+        _showSuccessMessage(successMessage);
       } else {
         _handleApiError(response);
       }
@@ -577,11 +883,8 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  // Add a method to check attendance service health
   Future<bool> checkServiceHealth() async {
     try {
-      // You can add a health check endpoint call here
-      // For now, we'll just return true
       return true;
     } catch (e) {
       print('Service health check failed: $e');
@@ -589,28 +892,23 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-// Enhanced validation method for attendance data
   bool validateAttendanceData(String employeeId, DateTime date, int status) {
-    // Check employee exists
     final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
     if (employee == null) {
       _showErrorMessage('Employee not found: $employeeId');
       return false;
     }
 
-    // Check date is valid
     if (date.isAfter(DateTime.now())) {
       _showErrorMessage('Cannot mark attendance for future dates');
       return false;
     }
 
-    // Check status is valid
     if (![0, 1, 2, 3].contains(status)) {
       _showErrorMessage('Invalid attendance status: $status');
       return false;
     }
 
-    // Check if date is within reasonable range
     final today = DateTime.now();
     final sixMonthsAgo = today.subtract(const Duration(days: 180));
     if (date.isBefore(sixMonthsAgo)) {
@@ -629,7 +927,6 @@ class AttendanceUIController extends GetxController {
       if (response['success'] == true && response['data'] != null) {
         final attendanceRecord =
             AttendanceService.attendanceRecordFromJson(response['data']);
-        // Process attendance record as needed
         _showSuccessMessage(
             'Attendance data loaded for ${DateFormat('dd/MM/yyyy').format(date)}');
       } else {
@@ -643,18 +940,16 @@ class AttendanceUIController extends GetxController {
   // MARK: - Wage Management
 
   /// Pay individual employee wages
-  Future<void> payEmployeeWages(
-    String employeeId,
-    double amount, {
-    String paymentMode = 'Cash',
-    String? paymentReference,
-    String? remarks,
-  }) async {
+  Future<void> payEmployeeWages(String employeeId, double amount,
+      {String paymentMode = 'Cash',
+      String? paymentReference,
+      String? remarks}) async {
     if (isProcessingPayment.value) return;
-
     isProcessingPayment.value = true;
 
     try {
+      print('💰 ========== PAYMENT START ==========');
+
       final request = WagePaymentRequest(
         employeeId: employeeId,
         amount: amount,
@@ -665,45 +960,28 @@ class AttendanceUIController extends GetxController {
         payAll: false,
       );
 
-      print('Sending payment request: ${request.toJson()}');
       final response = await AttendanceService.payWages(request: request);
 
-      print('Payment API Response: $response');
-
       if (response['success'] == true) {
-        print('Payment successful, processing response...');
-
-        // CRITICAL FIX: Extract and process payment data from response
-        final responseData = response['data'];
-        if (responseData != null) {
-          // Update local state immediately with response data
-          _updatePaymentStatusFromResponse(employeeId, responseData);
-
-          // Force UI refresh
-          _refreshPaymentUI();
-        }
-
-        // Then fetch fresh data from backend to ensure consistency
-        await Future.delayed(const Duration(
-            milliseconds: 500)); // Small delay to ensure DB is updated
-        await fetchWeeklyData();
-
-        // Get employee name for success message
         final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
         final employeeName = employee?.name ?? 'Employee';
 
-        print('Payment processed successfully:');
-        print('  Status: ${employeePaymentStatus[employeeId]}');
-        print('  Partial: ${employeePartialPayments[employeeId]}');
-        print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
+        // Extract success message from backend
+        String successMessage =
+            _extractSuccessMessage(response, 'Payment processed successfully');
 
-        _showPaymentSuccessDialog(employeeName, amount);
+        // Show custom dialog with backend message
+        _showPaymentSuccessDialog(employeeName, amount, successMessage);
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        await fetchWeeklyData();
+
+        print('💰 ========== PAYMENT COMPLETE ==========');
       } else {
-        print('Payment API failed: $response');
         _handleApiError(response);
       }
     } catch (e) {
-      print('Payment error: $e');
+      print('💥 Payment exception: $e');
       _handleException('Failed to process payment', e);
     } finally {
       isProcessingPayment.value = false;
@@ -713,7 +991,6 @@ class AttendanceUIController extends GetxController {
   void _updatePaymentStatusFromResponse(
       String employeeId, Map<String, dynamic> responseData) {
     try {
-      // Extract payment information from response
       if (responseData.containsKey('payment_status')) {
         employeePaymentStatus[employeeId] = responseData['payment_status'];
       }
@@ -728,7 +1005,6 @@ class AttendanceUIController extends GetxController {
             double.tryParse(responseData['remaining_amount'].toString()) ?? 0.0;
       }
 
-      // Alternative: If response contains employee data directly
       if (responseData.containsKey('employee')) {
         final empData = responseData['employee'];
         employeePaymentStatus[employeeId] =
@@ -738,112 +1014,79 @@ class AttendanceUIController extends GetxController {
         employeeRemainingAmounts[employeeId] =
             double.tryParse(empData['remaining_amount'].toString()) ?? 0.0;
       }
-
-      print('Updated payment status from response:');
-      print('  Employee: $employeeId');
-      print('  Status: ${employeePaymentStatus[employeeId]}');
-      print('  Partial Payment: ${employeePartialPayments[employeeId]}');
-      print('  Remaining: ${employeeRemainingAmounts[employeeId]}');
     } catch (e) {
       print('Error updating payment status from response: $e');
     }
   }
 
   bool _validateBulkPaymentConditions() {
-    // Check if there are any employees
     if (employees.isEmpty) {
       _showErrorMessage('No employees found for the selected week');
       return false;
     }
 
-    // Check if wages are already paid
     if (wagesPaid.value) {
       _showErrorMessage('All wages have already been paid for this week');
       return false;
     }
 
-    // Check if there are any unpaid amounts
     double totalUnpaid = getTotalRemainingAmount();
     if (totalUnpaid <= 0) {
       _showErrorMessage('No pending payments found for this week');
       return false;
     }
 
-    // Check if total wages is reasonable
     if (grandTotalWages.value <= 0) {
       _showErrorMessage(
           'Total wages amount is invalid: ₹${grandTotalWages.value}');
       return false;
     }
 
-    print(
-        'Validation passed: ₹$totalUnpaid pending for ${employees.length} employees');
     return true;
   }
 
-  /// NEW METHOD: Force refresh payment UI
   void _refreshPaymentUI() {
-    // Force refresh of all observable maps
     employeePaymentStatus.refresh();
     employeePartialPayments.refresh();
     employeeRemainingAmounts.refresh();
-
-    // Recalculate grand total wages and payment status
     _recalculateWageSummary();
-
-    // Force rebuild of employees list
     employees.refresh();
   }
 
-  /// NEW METHOD: Recalculate wage summary
   void _recalculateWageSummary() {
     double totalPaid = 0.0;
     bool allPaid = true;
+    bool hasEmployeesWithWages = false;
 
     for (var employee in employees) {
+      final totalWages = getTotalWages(employee.id);
       final paidAmount = getPartialPayment(employee.id);
       final remainingAmount = getRemainingAmount(employee.id);
 
       totalPaid += paidAmount;
 
-      if (remainingAmount > 0) {
-        allPaid = false;
+      if (totalWages > 0) {
+        hasEmployeesWithWages = true;
+        if (remainingAmount > 0) {
+          allPaid = false;
+        }
       }
     }
 
-    // Update wages paid status
-    wagesPaid.value = allPaid && employees.isNotEmpty;
-
-    print('Recalculated wage summary:');
-    print('  Total Paid: $totalPaid');
-    print('  All Paid: $allPaid');
-    print('  Grand Total: ${grandTotalWages.value}');
+    wagesPaid.value = hasEmployeesWithWages && allPaid;
   }
 
-  Future<void> payAllWages({
-    String paymentMode = 'Cash',
-    String? paymentReference,
-    String? remarks,
-  }) async {
+  Future<void> payAllWages(
+      {String paymentMode = 'Cash',
+      String? paymentReference,
+      String? remarks}) async {
     if (isProcessingPayment.value) return;
 
-    // Pre-validation before API call
-    if (!_validateBulkPaymentConditions()) {
-      return;
-    }
+    if (!_validateBulkPaymentConditions()) return;
 
     isProcessingPayment.value = true;
 
     try {
-      print('=== PAY ALL WAGES VALIDATION ===');
-      print('Total employees: ${employees.length}');
-      print('Grand total wages: ${grandTotalWages.value}');
-      print('Currently wages paid status: ${wagesPaid.value}');
-      print('Week start: ${selectedWeekStart.value.toDateString()}');
-
-      // Debug current payment status
-      _debugCurrentPaymentStatus();
-
       final request = WagePaymentRequest(
         employeeId: null,
         amount: 0.0,
@@ -855,52 +1098,20 @@ class AttendanceUIController extends GetxController {
         payAll: true,
       );
 
-      print('Sending bulk payment request: ${request.toJson()}');
-
       final response = await AttendanceService.payWages(request: request);
 
-      print('Bulk payment API response: $response');
-
       if (response['success'] == true) {
-        print('Bulk payment successful, refreshing data...');
         await _handleSuccessfulBulkPayment(response['data']);
       } else {
-        print('Bulk payment failed: ${response}');
         await _handleBulkPaymentError(response);
       }
     } catch (e) {
-      print('Bulk payment exception: $e');
       _handleException('Failed to process bulk payment', e);
     } finally {
       isProcessingPayment.value = false;
     }
   }
 
-  void _debugCurrentPaymentStatus() {
-    print('=== PAYMENT STATUS DEBUG ===');
-    for (var employee in employees) {
-      final status = getPaymentStatus(employee.id);
-      final partial = getPartialPayment(employee.id);
-      final remaining = getRemainingAmount(employee.id);
-      final totalWages = getTotalWages(employee.id);
-
-      print('Employee: ${employee.name}');
-      print('  Status: $status');
-      print('  Total Wages: ₹$totalWages');
-      print('  Partial Payment: ₹$partial');
-      print('  Remaining: ₹$remaining');
-      print('  Has Wage: ${employee.hasWage}');
-      print('---');
-    }
-
-    print('Total employees: ${employees.length}');
-    print('Grand total wages: ₹${grandTotalWages.value}');
-    print('Total paid: ₹${getTotalPaidAmount()}');
-    print('Total remaining: ₹${getTotalRemainingAmount()}');
-    print('Wages paid status: ${wagesPaid.value}');
-  }
-
-// 4. Enhanced error handling for bulk payment failures
   Future<void> _handleBulkPaymentError(Map<String, dynamic> response) async {
     final statusCode = response['statusCode'];
     final errorData = response['data'] ?? {};
@@ -910,7 +1121,6 @@ class AttendanceUIController extends GetxController {
     switch (statusCode) {
       case 400:
         if (errorMessage.contains('No pending payments')) {
-          // This is the specific error you're getting
           await _handleNoPendingPaymentsError();
         } else {
           _showErrorMessage('Invalid request: $errorMessage');
@@ -918,7 +1128,7 @@ class AttendanceUIController extends GetxController {
         break;
       case 404:
         _showErrorMessage('Week data not found. Please refresh and try again.');
-        await fetchWeeklyData(); // Auto-refresh
+        await fetchWeeklyData();
         break;
       case 500:
         _showErrorMessage('Server error occurred. Please try again later.');
@@ -928,55 +1138,43 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-// 5. Handle "No pending payments" error specifically
   Future<void> _handleNoPendingPaymentsError() async {
-    print('Handling "No pending payments" error...');
-
-    // Force refresh data to sync with backend
     await fetchWeeklyData();
 
-    // Check again after refresh
     if (getTotalRemainingAmount() > 0) {
-      // If we still have pending amounts locally, there's a data sync issue
       Get.dialog(
         AlertDialog(
           title: const Text('Data Synchronization Issue'),
           content: const Text(
-              'There seems to be a mismatch between local and server data. '
-              'The data has been refreshed. Please try the payment again.'),
+              'There seems to be a mismatch between local and server data. The data has been refreshed. Please try the payment again.'),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: const Text('OK'),
-            ),
+            TextButton(onPressed: () => Get.back(), child: const Text('OK')),
           ],
         ),
       );
     } else {
-      // All payments are actually completed
       Get.dialog(
         AlertDialog(
           title: const Text('All Payments Complete'),
-          content: const Text('All wages for this week have already been paid. '
-              'The payment status has been updated.'),
+          content: const Text(
+              'All wages for this week have already been paid. The payment status has been updated.'),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: const Text('OK'),
-            ),
+            TextButton(onPressed: () => Get.back(), child: const Text('OK')),
           ],
         ),
       );
     }
   }
 
-// 6. Enhanced successful bulk payment handler
   Future<void> _handleSuccessfulBulkPayment(
       Map<String, dynamic>? responseData) async {
-    // Refresh data from backend
+    print('💰 Bulk payment successful, refreshing data...');
+
+    // CRITICAL: Fetch fresh data
     await fetchWeeklyData();
 
-    // Show success dialog with details
+    print('✅ Data refreshed after bulk payment');
+
     if (responseData != null) {
       _showBulkPaymentSuccessDialog(responseData);
     } else {
@@ -984,21 +1182,35 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-// Add success dialog for bulk payments
   void _showBulkPaymentSuccessDialog(Map<String, dynamic> responseData) {
+    // Extract message from response
+    String message = responseData['message']?.toString() ??
+        'All pending wages have been paid successfully!';
+
     Get.dialog(
       AlertDialog(
-        title: const Text('Bulk Payment Successful'),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green.shade600, size: 28),
+            const SizedBox(width: 8),
+            const Text('Bulk Payment Successful'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('All pending wages have been paid successfully!'),
+            Text(message, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 12),
-            Text(
-                'Total Amount Paid: ₹${responseData['total_amount_paid'] ?? 0}'),
-            Text('Total Employees: ${responseData['total_employees'] ?? 0}'),
-            Text('Week: ${responseData['week_start_date'] ?? ''}'),
+            const Divider(),
+            const SizedBox(height: 8),
+            if (responseData['total_amount_paid'] != null)
+              Text('Total Amount Paid: ₹${responseData['total_amount_paid']}',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (responseData['total_employees'] != null)
+              Text('Total Employees: ${responseData['total_employees']}'),
+            if (responseData['week_start_date'] != null)
+              Text('Week: ${responseData['week_start_date']}'),
             if (responseData['payment_mode'] != null)
               Text('Payment Mode: ${responseData['payment_mode']}'),
           ],
@@ -1013,26 +1225,59 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  /// Force refresh of weekly data - useful when you know employees were added
-  Future<void> forceRefreshWeeklyData() async {
-    print('Force refreshing weekly data...');
+// Enhanced payment success dialog
+  void _showPaymentSuccessDialog(String employeeName, double amount,
+      [String? customMessage]) {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green.shade600, size: 28),
+            const SizedBox(width: 8),
+            const Text('Payment Successful'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (customMessage != null) ...[
+              Text(customMessage, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+            ],
+            Text('Employee: $employeeName',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('Amount Paid: ₹${amount.toStringAsFixed(0)}',
+                style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
-    // Clear cached data
+  Future<void> forceRefreshWeeklyData() async {
     weeklyData.value = null;
     _clearLocalData();
-
-    // Fetch fresh data
     await fetchWeeklyData();
   }
 
-  /// Method to manually sync employees (can be called from UI)
   Future<void> syncEmployeesForCurrentWeek() async {
     if (isLoading.value) return;
-
     isLoading.value = true;
 
     try {
-      // This will trigger the backend to sync the weekly record with active employees
       await fetchWeeklyData();
       _showSuccessMessage('Employees synchronized successfully');
     } catch (e) {
@@ -1042,28 +1287,21 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Generate weekly wage PDF
   Future<void> generateWeeklyWagePdf() async {
     if (isPdfGenerating.value) return;
-
     isPdfGenerating.value = true;
 
     try {
-      print('Starting PDF generation for week: ${selectedWeekStart.value}');
-
-      // Check and request storage permissions
       if (!await _checkStoragePermissions()) {
         _showErrorMessage('Storage permission is required to save PDF files');
         return;
       }
 
       final response = await AttendanceService.generateWeeklyWagePdf(
-        weekStart: selectedWeekStart.value,
-      );
+          weekStart: selectedWeekStart.value);
 
       if (response['success'] == true) {
         final pdfData = response['data'];
-
         if (pdfData != null && pdfData.isNotEmpty) {
           await _savePdfFile(pdfData, selectedWeekStart.value);
         } else {
@@ -1079,64 +1317,45 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Check and request storage permissions
   Future<bool> _checkStoragePermissions() async {
-    // For Android 11+ (API 30+), we don't need WRITE_EXTERNAL_STORAGE
-    // But for older versions, we might need it
     if (Platform.isAndroid) {
       final status = await Permission.storage.status;
-
       if (status.isDenied) {
         final result = await Permission.storage.request();
         return result.isGranted;
       }
-
       return status.isGranted;
     }
-
-    // For iOS, no special permissions needed for Documents directory
     return true;
   }
 
-  /// Save PDF file to device storage
   Future<void> _savePdfFile(List<int> pdfBytes, DateTime weekStart) async {
     try {
       final fileName =
           'weekly_wages_${DateFormat('yyyy_MM_dd').format(weekStart)}.pdf';
-
       Directory? directory;
 
       if (Platform.isAndroid) {
-        // Try to save to Downloads directory
         directory = Directory('/storage/emulated/0/Download');
-
-        // If Downloads directory is not accessible, use app's documents directory
         if (!await directory.exists()) {
           directory = await getExternalStorageDirectory();
           directory ??= await getApplicationDocumentsDirectory();
         }
       } else if (Platform.isIOS) {
-        // For iOS, use app's documents directory
         directory = await getApplicationDocumentsDirectory();
       }
 
-      if (directory == null) {
+      if (directory == null)
         throw Exception('Could not access storage directory');
-      }
 
       final file = File('${directory.path}/$fileName');
       await file.writeAsBytes(pdfBytes);
-
-      print('PDF saved to: ${file.path}');
-
       _showPdfSuccessDialog(file.path, fileName);
     } catch (e) {
-      print('Error saving PDF: $e');
       _handleException('Failed to save PDF file', e);
     }
   }
 
-  /// Show PDF generation success dialog
   void _showPdfSuccessDialog(String filePath, String fileName) {
     Get.dialog(
       AlertDialog(
@@ -1164,32 +1383,20 @@ class AttendanceUIController extends GetxController {
                   const Icon(Icons.insert_drive_file, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      fileName,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    child: Text(fileName,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w500)),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Saved to: ${Platform.isAndroid ? "Downloads" : "Documents"}',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade600,
-              ),
-            ),
+            Text('Saved to: ${Platform.isAndroid ? "Downloads" : "Documents"}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Close'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
           ElevatedButton.icon(
             onPressed: () async {
               Get.back();
@@ -1203,49 +1410,37 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  /// Open PDF file with default application
   Future<void> _openPdfFile(String filePath) async {
     try {
       final result = await OpenFile.open(filePath);
-
       if (result.type != ResultType.done) {
-        // If default PDF viewer is not available, show options
         Get.dialog(
           AlertDialog(
             title: const Text('Cannot Open PDF'),
             content: const Text(
-              'No PDF viewer app found. Please install a PDF reader app from the Play Store or App Store to view the generated PDF.',
-            ),
+                'No PDF viewer app found. Please install a PDF reader app from the Play Store or App Store to view the generated PDF.'),
             actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('OK'),
-              ),
+              TextButton(onPressed: () => Get.back(), child: const Text('OK')),
             ],
           ),
         );
       }
     } catch (e) {
-      print('Error opening PDF: $e');
       _showErrorMessage(
           'Could not open PDF file. Please check if you have a PDF viewer installed.');
     }
   }
 
-  /// Generate and share PDF via sharing options
   Future<void> generateAndSharePdf() async {
     if (isPdfGenerating.value) return;
-
     isPdfGenerating.value = true;
 
     try {
       final response = await AttendanceService.generateWeeklyWagePdf(
-        weekStart: selectedWeekStart.value,
-      );
+          weekStart: selectedWeekStart.value);
 
       if (response['success'] == true) {
         final pdfData = response['data'];
-
         if (pdfData != null && pdfData.isNotEmpty) {
           await _sharePdfFile(pdfData, selectedWeekStart.value);
         } else {
@@ -1261,26 +1456,20 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Share PDF file using system sharing
   Future<void> _sharePdfFile(List<int> pdfBytes, DateTime weekStart) async {
     try {
       final fileName =
           'weekly_wages_${DateFormat('yyyy_MM_dd').format(weekStart)}.pdf';
-
-      // Get temporary directory for sharing
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(pdfBytes);
-
       _showSuccessMessage(
           'PDF generated successfully. File saved to temporary storage.');
     } catch (e) {
-      print('Error sharing PDF: $e');
       _handleException('Failed to share PDF file', e);
     }
   }
 
-  /// Show error message
   void _showErrorMessage(String message) {
     Get.snackbar(
       'Error',
@@ -1292,12 +1481,10 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  /// Get wage summary for current week
   Future<void> fetchWageSummary() async {
     try {
       final response = await AttendanceService.getWageSummary(
-        weekStart: selectedWeekStart.value,
-      );
+          weekStart: selectedWeekStart.value);
 
       if (response['success'] == true && response['data'] != null) {
         final wageSummary =
@@ -1311,20 +1498,14 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  // MARK: - Export Functionality
-
-  /// Export attendance to Excel
   Future<void> exportAttendanceToExcel(
       DateTime fromDate, DateTime toDate) async {
     if (isExporting.value) return;
-
     isExporting.value = true;
 
     try {
       final response = await AttendanceService.exportAttendance(
-        fromDate: fromDate,
-        toDate: toDate,
-      );
+          fromDate: fromDate, toDate: toDate);
 
       if (response['success'] == true && response['data'] != null) {
         final exportData =
@@ -1340,16 +1521,12 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  // MARK: - Navigation Methods
-
-  /// Navigate to previous week
   void previousWeek() {
     selectedWeekStart.value =
         selectedWeekStart.value.subtract(const Duration(days: 7));
     fetchWeeklyData();
   }
 
-  /// Navigate to next week
   void nextWeek() {
     final now = DateTime.now();
     final nextWeekStart = selectedWeekStart.value.add(const Duration(days: 7));
@@ -1359,21 +1536,16 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Go to current week
   void goToCurrentWeek() {
     selectedWeekStart.value = DateTime.now().mondayOfWeek;
     fetchWeeklyData();
   }
 
-  /// Navigate to specific week
   void goToWeek(DateTime weekStart) {
     selectedWeekStart.value = weekStart.mondayOfWeek;
     fetchWeeklyData();
   }
 
-  // MARK: - Employee Ordering
-
-  /// Show employee order dialog
   void showEmployeeOrderDialog() {
     if (customEmployeeOrder.isEmpty) {
       customEmployeeOrder.value = employees.map((e) => e.id).toList();
@@ -1403,35 +1575,23 @@ class AttendanceUIController extends GetxController {
                   );
                 },
                 onReorder: (oldIndex, newIndex) {
-                  if (newIndex > oldIndex) {
-                    newIndex -= 1;
-                  }
+                  if (newIndex > oldIndex) newIndex -= 1;
                   final item = customEmployeeOrder.removeAt(oldIndex);
                   customEmployeeOrder.insert(newIndex, item);
                 },
               )),
         ),
         actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: _resetEmployeeOrder,
-            child: const Text('Reset'),
-          ),
+              onPressed: _resetEmployeeOrder, child: const Text('Reset')),
           ElevatedButton(
-            onPressed: _saveEmployeeOrder,
-            child: const Text('Save Order'),
-          ),
+              onPressed: _saveEmployeeOrder, child: const Text('Save Order')),
         ],
       ),
     );
   }
 
-  // MARK: - Helper Methods
-
-  /// Check if wages are paid and show restriction message
   bool _checkWagesPaidRestriction() {
     if (wagesPaid.value) {
       Get.dialog(
@@ -1440,10 +1600,7 @@ class AttendanceUIController extends GetxController {
           content: const Text(
               "Wages have already been paid for this week. You cannot update attendance."),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: const Text("OK"),
-            ),
+            TextButton(onPressed: () => Get.back(), child: const Text("OK")),
           ],
         ),
       );
@@ -1452,7 +1609,6 @@ class AttendanceUIController extends GetxController {
     return false;
   }
 
-  /// Clear local data before refresh
   void _clearLocalData() {
     employees.clear();
     attendanceRecords.clear();
@@ -1462,39 +1618,21 @@ class AttendanceUIController extends GetxController {
     dailyEmployeeCount.clear();
   }
 
-  /// Update local attendance record
   void _updateLocalAttendance(String employeeId, DateTime date, int status) {
     try {
-      // Validate inputs
-      if (employeeId.isEmpty) {
-        print('Warning: Empty employee ID in _updateLocalAttendance');
-        return;
-      }
+      if (employeeId.isEmpty || ![0, 1, 2, 3].contains(status)) return;
 
-      if (![0, 1, 2, 3].contains(status)) {
-        print('Warning: Invalid status $status in _updateLocalAttendance');
-        return;
-      }
-
-      // Ensure attendance record exists
       if (attendanceRecords[employeeId] == null) {
         attendanceRecords[employeeId] = {};
       }
 
-      // Update the record
       attendanceRecords[employeeId]![date] = status;
-
-      // Force observable update
       attendanceRecords.refresh();
-
-      print(
-          'Local attendance updated: Employee $employeeId, Date $date, Status $status');
     } catch (e) {
       print('Error in _updateLocalAttendance: $e');
     }
   }
 
-  /// Apply employee ordering
   void _applyEmployeeOrdering() {
     if (!useCustomOrder.value || customEmployeeOrder.isEmpty) {
       employees.sort((a, b) => a.name.compareTo(b.name));
@@ -1503,7 +1641,6 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Apply custom employee order
   void _applyCustomOrder() {
     final reorderedEmployees = <EmployeeAttendanceRecord>[];
 
@@ -1511,12 +1648,9 @@ class AttendanceUIController extends GetxController {
       try {
         final employee = employees.firstWhere((e) => e.id == employeeId);
         reorderedEmployees.add(employee);
-      } catch (e) {
-        // Employee not found, skip
-      }
+      } catch (e) {}
     }
 
-    // Add any employees not in custom order
     for (EmployeeAttendanceRecord employee in employees) {
       if (!customEmployeeOrder.contains(employee.id)) {
         reorderedEmployees.add(employee);
@@ -1526,7 +1660,6 @@ class AttendanceUIController extends GetxController {
     employees.value = reorderedEmployees;
   }
 
-  /// Calculate employee counts from weekly data
   void _calculateEmployeeCounts(WeeklyData data) {
     dailyEmployeeCount.clear();
 
@@ -1540,7 +1673,6 @@ class AttendanceUIController extends GetxController {
     weeklyEmployeeCount.value = data.weeklyEmployeeCount;
   }
 
-  /// Reset employee order
   void _resetEmployeeOrder() {
     customEmployeeOrder.value = employees.map((e) => e.id).toList();
     employees.sort((a, b) => a.name.compareTo(b.name));
@@ -1549,7 +1681,6 @@ class AttendanceUIController extends GetxController {
     useCustomOrder.value = false;
   }
 
-  /// Save employee order
   void _saveEmployeeOrder() {
     saveEmployeeOrder();
     Get.back();
@@ -1557,41 +1688,6 @@ class AttendanceUIController extends GetxController {
     _applyCustomOrder();
   }
 
-  // MARK: - Dialog Methods
-
-  /// Show payment success dialog
-  void _showPaymentSuccessDialog(String employeeName, double amount) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Payment Successful'),
-        content: Text('₹${amount.toStringAsFixed(0)} paid to $employeeName'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Show pay all success dialog
-  void _showPayAllSuccessDialog() {
-    Get.dialog(
-      AlertDialog(
-        title: Text('₹${grandTotalWages.value.toStringAsFixed(0)}'),
-        content: const Text('All Wages Paid Successfully'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Show wage summary dialog
   void _showWageSummaryDialog(WageSummary summary) {
     Get.dialog(
       AlertDialog(
@@ -1617,36 +1713,27 @@ class AttendanceUIController extends GetxController {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Close'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
         ],
       ),
     );
   }
 
-  /// Show export success dialog
   void _showExportSuccessDialog(
       AttendanceExport exportData, DateTime fromDate, DateTime toDate) {
     Get.dialog(
       AlertDialog(
         title: const Text('Export Complete'),
-        content:
-            Text('Exported ${exportData.totalRecords} records for date range:\n'
-                '${DateFormat('dd/MM/yyyy').format(fromDate)} to '
-                '${DateFormat('dd/MM/yyyy').format(toDate)}'),
+        content: Text(
+            'Exported ${exportData.totalRecords} records for date range:\n'
+            '${DateFormat('dd/MM/yyyy').format(fromDate)} to ${DateFormat('dd/MM/yyyy').format(toDate)}'),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('OK')),
         ],
       ),
     );
   }
 
-  /// Build summary row for dialogs
   Widget _buildSummaryRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1660,23 +1747,38 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  // MARK: - Error Handling
-
-  /// Handle API errors
   void _handleApiError(Map<String, dynamic> response) {
-    print('API Error Response: $response');
-
     String message = 'An error occurred';
 
     // Try to extract error message from various possible locations
-    if (response['data'] != null && response['data']['message'] != null) {
-      message = response['data']['message'];
-    } else if (response['error'] != null) {
-      message = response['error'];
-    } else if (response['message'] != null) {
-      message = response['message'];
-    } else if (response['errors'] != null) {
-      // Handle validation errors
+    if (response['data'] != null) {
+      if (response['data'] is Map) {
+        final data = response['data'] as Map;
+
+        // Check for 'message' in data
+        if (data['message'] != null) {
+          message = data['message'].toString();
+        }
+        // Check for 'error' in data
+        else if (data['error'] != null) {
+          message = data['error'].toString();
+        }
+      }
+      // If data is a string
+      else if (response['data'] is String) {
+        message = response['data'].toString();
+      }
+    }
+    // Check top-level 'error' field
+    else if (response['error'] != null) {
+      message = response['error'].toString();
+    }
+    // Check top-level 'message' field
+    else if (response['message'] != null) {
+      message = response['message'].toString();
+    }
+    // Check for 'errors' array/map
+    else if (response['errors'] != null) {
       if (response['errors'] is Map) {
         final errors = response['errors'] as Map;
         message = errors.values.join(', ');
@@ -1686,9 +1788,12 @@ class AttendanceUIController extends GetxController {
     }
 
     _showErrorMessage(message);
+
+    // Log for debugging
+    print('❌ API Error: $message');
+    print('Full response: $response');
   }
 
-  /// Handle exceptions
   void _handleException(String context, dynamic error) {
     Get.snackbar(
       'Error',
@@ -1699,7 +1804,6 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  /// Show success message
   void _showSuccessMessage(String message) {
     Get.snackbar(
       'Success',
@@ -1710,12 +1814,62 @@ class AttendanceUIController extends GetxController {
     );
   }
 
-  // MARK: - Persistence Methods (Mock implementations)
+  String _extractSuccessMessage(
+      Map<String, dynamic> response, String defaultMessage) {
+    // Try data.message first
+    if (response['data'] != null && response['data'] is Map) {
+      final data = response['data'] as Map;
+      if (data['message'] != null) {
+        return data['message'].toString();
+      }
+    }
 
-  /// Save employee order to persistent storage
+    // Try top-level message
+    if (response['message'] != null) {
+      return response['message'].toString();
+    }
+
+    return defaultMessage;
+  }
+
+  String _extractErrorMessage(
+      Map<String, dynamic> response, String defaultMessage) {
+    // Try data.message first
+    if (response['data'] != null && response['data'] is Map) {
+      final data = response['data'] as Map;
+      if (data['message'] != null) {
+        return data['message'].toString();
+      }
+      if (data['error'] != null) {
+        return data['error'].toString();
+      }
+    }
+
+    // Try top-level error
+    if (response['error'] != null) {
+      return response['error'].toString();
+    }
+
+    // Try top-level message
+    if (response['message'] != null) {
+      return response['message'].toString();
+    }
+
+    // Try errors array/map
+    if (response['errors'] != null) {
+      if (response['errors'] is Map) {
+        final errors = response['errors'] as Map;
+        return errors.values.join(', ');
+      } else if (response['errors'] is List) {
+        return (response['errors'] as List).join(', ');
+      }
+    }
+
+    return defaultMessage;
+  }
+
   Future<void> saveEmployeeOrder() async {
     try {
-      // TODO: Implement actual persistence (SharedPreferences, Hive, etc.)
       await Future.delayed(const Duration(milliseconds: 200));
       _showSuccessMessage('Employee order saved successfully');
     } catch (e) {
@@ -1723,10 +1877,8 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Load employee order from persistent storage
   Future<void> loadEmployeeOrder() async {
     try {
-      // TODO: Implement actual persistence loading
       await Future.delayed(const Duration(milliseconds: 200));
       customEmployeeOrder.value = [];
       useCustomOrder.value = false;
@@ -1735,9 +1887,6 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  // MARK: - Utility Methods
-
-  /// Get attendance status text for display
   String getAttendanceStatusText(int? status) {
     switch (status) {
       case 0:
@@ -1753,7 +1902,6 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Get attendance status color
   Color getAttendanceStatusColor(int? status) {
     switch (status) {
       case 0:
@@ -1769,51 +1917,37 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  /// Check if all employees are paid
-  bool get allEmployeesPaid {
-    return employees
-        .every((employee) => employeePaymentStatus[employee.id] == 'paid');
-  }
+  bool get allEmployeesPaid => employees
+      .every((employee) => employeePaymentStatus[employee.id] == 'paid');
 
-  /// Get remaining amount for employee
-  double getRemainingAmount(String employeeId) {
-    return employeeRemainingAmounts[employeeId] ?? 0.0;
-  }
+  double getRemainingAmount(String employeeId) =>
+      employeeRemainingAmounts[employeeId] ?? 0.0;
 
-  /// Get payment status for employee
-  String getPaymentStatus(String employeeId) {
-    return employeePaymentStatus[employeeId] ?? 'pending';
-  }
+  String getPaymentStatus(String employeeId) =>
+      employeePaymentStatus[employeeId] ?? 'pending';
 
-  /// Get partial payment amount for employee
-  double getPartialPayment(String employeeId) {
-    return employeePartialPayments[employeeId] ?? 0.0;
-  }
+  double getPartialPayment(String employeeId) =>
+      employeePartialPayments[employeeId] ?? 0.0;
 
-  /// Check if can navigate to next week
   bool get canNavigateNext {
     final nextWeekStart = selectedWeekStart.value.add(const Duration(days: 7));
     return !nextWeekStart.isAfter(DateTime.now().mondayOfWeek);
   }
 
-  /// Get formatted week range
   String get formattedWeekRange {
     final start = selectedWeekStart.value;
     final end = start.add(const Duration(days: 6));
     return '${DateFormat('dd MMM').format(start)} - ${DateFormat('dd MMM yyyy').format(end)}';
   }
 
-  /// Get total present days for employee in current week
   int getTotalPresentDays(String employeeId) {
     if (attendanceRecords[employeeId] == null) return 0;
-
     return attendanceRecords[employeeId]!
         .values
         .where((status) => status == 1 || status == 2)
         .length;
   }
 
-  /// Get total wages for employee in current week
   double getTotalWages(String employeeId) {
     final employee = employees.firstWhereOrNull((e) => e.id == employeeId);
     if (employee == null || attendanceRecords[employeeId] == null) return 0.0;
@@ -1832,11 +1966,9 @@ class AttendanceUIController extends GetxController {
 
   @override
   void onClose() {
-    // Clean up any resources if needed
     super.onClose();
   }
 
-  /// Get total paid amount across all employees
   double getTotalPaidAmount() {
     double totalPaid = 0.0;
     for (var employee in employees) {
@@ -1845,17 +1977,12 @@ class AttendanceUIController extends GetxController {
     return totalPaid;
   }
 
-  /// Get total remaining amount across all employees
-  double getTotalRemainingAmount() {
-    return grandTotalWages.value - getTotalPaidAmount();
-  }
+  double getTotalRemainingAmount() =>
+      grandTotalWages.value - getTotalPaidAmount();
 
-  /// Check if there are any unpaid employees
-  bool get hasUnpaidEmployees {
-    return employees.any((employee) => getRemainingAmount(employee.id) > 0);
-  }
+  bool get hasUnpaidEmployees =>
+      employees.any((employee) => getRemainingAmount(employee.id) > 0);
 
-  /// Get count of employees by payment status
   Map<String, int> getPaymentStatusCounts() {
     int paid = 0;
     int partial = 0;
@@ -1874,14 +2001,9 @@ class AttendanceUIController extends GetxController {
       }
     }
 
-    return {
-      'paid': paid,
-      'partial': partial,
-      'pending': pending,
-    };
+    return {'paid': paid, 'partial': partial, 'pending': pending};
   }
 
-  /// Update individual employee remaining amount after payment
   void updateEmployeeRemainingAmount(String employeeId, double paidAmount) {
     final currentRemaining = getRemainingAmount(employeeId);
     final newRemaining = currentRemaining - paidAmount;
@@ -1897,7 +2019,6 @@ class AttendanceUIController extends GetxController {
           (employeePartialPayments[employeeId] ?? 0.0) + paidAmount;
     }
 
-    // Force UI refresh
     employeePaymentStatus.refresh();
     employeeRemainingAmounts.refresh();
     employeePartialPayments.refresh();

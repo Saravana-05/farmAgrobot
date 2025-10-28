@@ -152,7 +152,6 @@ class AddExpenses extends StatelessWidget {
           ),
         ),
         labelStyle: const TextStyle(color: kSecondaryColor),
-
       ),
     );
   }
@@ -230,7 +229,6 @@ class AddExpenses extends StatelessWidget {
               ),
             ),
             labelStyle: const TextStyle(color: kSecondaryColor),
-
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -273,7 +271,6 @@ class AddExpenses extends StatelessWidget {
               ),
             ),
             labelStyle: const TextStyle(color: kSecondaryColor),
-
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {

@@ -21,55 +21,6 @@ class ViewSales extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Sales Management'),
-        backgroundColor: kPrimaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: controller.addNewSale,
-            tooltip: 'Add New Sale',
-          ),
-          PopupMenuButton(
-            icon: const Icon(Icons.more_vert),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'export_excel',
-                child: Row(
-                  children: const [
-                    Icon(Icons.file_download, size: 20),
-                    SizedBox(width: 8),
-                    Text('Export Excel'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'refresh',
-                child: Row(
-                  children: const [
-                    Icon(Icons.refresh, size: 20),
-                    SizedBox(width: 8),
-                    Text('Refresh'),
-                  ],
-                ),
-              ),
-            ],
-            onSelected: (value) {
-              switch (value) {
-                case 'export_excel':
-                  controller.generateExcelReport();
-                  break;
-                case 'refresh':
-                  controller.refreshSales();
-                  break;
-              }
-            },
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: controller.refreshSales,
         child: Column(
@@ -255,58 +206,8 @@ class ViewSales extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Add Sale Button
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: controller.addNewSale,
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text(
-                    'Add New Sale',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 12),
-
-              // Refresh Button
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Obx(() => controller.isLoading.value
-                    ? Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: kPrimaryColor,
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        onPressed: controller.refreshSales,
-                        icon: Icon(Icons.refresh, color: kPrimaryColor),
-                      )),
-              ),
-            ],
-          ),
-
           // Summary Information
-          SizedBox(height: 16),
+
           Obx(() => Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(

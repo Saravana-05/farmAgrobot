@@ -10,13 +10,14 @@ import '../controller/emp_view_controller.dart';
 class ViewEmployees extends StatelessWidget {
   final EmployeeViewController controller = Get.put(EmployeeViewController());
 
-  final TextStyle textStyle = const TextStyle(fontSize: 12.0);
-  final TextStyle boldTextStyle =
-      const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold);
-
   final List<Color> backgroundColors = [
-    kLightGreen.withOpacity(0.9),
-    kListBg.withOpacity(0.9)
+    kLightGreen,
+    kListBg,
+  ];
+
+  final List<Color> avatarBorderColors = [
+    kLightYellow,
+    kLightGreen,
   ];
 
   ViewEmployees({Key? key}) : super(key: key);
@@ -24,35 +25,50 @@ class ViewEmployees extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.only(top: 20.0, right: 20.0, left: 20.0),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(25.0),
-                color: Colors.grey[100],
-              ),
-              child: TextField(
-                onChanged: controller.runFilter,
-                decoration: InputDecoration(
-                  hintText: 'Search employees...',
-                  hintStyle: TextStyle(color: kSecondaryColor),
-                  border: InputBorder.none,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  prefixIcon: Icon(Icons.search, color: kSecondaryColor),
+          // Compact Header with Search
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
-                style: TextStyle(
-                  fontFamily: 'NotoSansTamil',
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.0),
+                    color: Colors.grey[100],
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: TextField(
+                    onChanged: controller.runFilter,
+                    style: TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search employees...',
+                      hintStyle:
+                          TextStyle(color: Colors.grey[400], fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      prefixIcon:
+                          Icon(Icons.search, color: kSecondaryColor, size: 20),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 8.0),
-          const SizedBox(height: 8.0),
 
           // Employees List
           Expanded(
@@ -69,9 +85,10 @@ class ViewEmployees extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: kPrimaryColor),
+            CircularProgressIndicator(color: kPrimaryColor, strokeWidth: 3),
             SizedBox(height: 16),
-            Text('Loading employees...'),
+            Text('Loading employees...',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
           ],
         ),
       );
@@ -82,13 +99,36 @@ class ViewEmployees extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey),
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child:
+                  Icon(Icons.people_outline, size: 48, color: Colors.grey[400]),
+            ),
             SizedBox(height: 16),
-            Text('No employees found.'),
-            SizedBox(height: 8),
-            ElevatedButton(
+            Text('No employees found',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800])),
+            SizedBox(height: 6),
+            Text('Try adjusting your search',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            SizedBox(height: 20),
+            ElevatedButton.icon(
               onPressed: controller.refreshEmployees,
-              child: Text('Refresh'),
+              icon: Icon(Icons.refresh, size: 18),
+              label: Text('Refresh', style: TextStyle(fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ],
         ),
@@ -102,235 +142,294 @@ class ViewEmployees extends StatelessWidget {
         Expanded(
           child: RefreshIndicator(
             onRefresh: controller.refreshEmployees,
+            color: kPrimaryColor,
             child: ListView.builder(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
               itemCount: paginatedEmployees.length,
               itemBuilder: (context, index) {
                 final employee = paginatedEmployees[index];
-                final backgroundColor = backgroundColors[index % 2];
-
-                return Container(
-                  color: backgroundColor,
-                  padding: EdgeInsets.all(10.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Profile Image with gender indicator
-                      GestureDetector(
-                        onTap: () {
-                          final imageUrl =
-                              controller.getEmployeeImageUrl(employee);
-                          _showImageDialog(imageUrl);
-                        },
-                        child: Stack(
-                          children: [
-                            _buildEmployeeAvatar(employee, 50),
-                            // Gender icon badge
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: _buildGenderBadge(employee.gender),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(width: 10),
-
-                      // Employee Details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Employee Name with Tamil support
-                            Text(
-                              controller.getEmployeeDisplayName(employee),
-                              style: boldTextStyle.copyWith(
-                                fontFamily: 'NotoSansTamil',
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            // Tamil Name
-                            if (employee.tamilName != null &&
-                                employee.tamilName!.isNotEmpty)
-                              Text(
-                                employee.tamilName!,
-                                style: textStyle.copyWith(
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.grey[600],
-                                  fontFamily: 'NotoSansTamil',
-                                ),
-                              ),
-                            // Employee Type and Gender with icon
-                            Row(
-                              children: [
-                                Text(
-                                  employee.empType ?? 'N/A',
-                                  style: textStyle,
-                                ),
-                                Text(' • ', style: textStyle),
-                                _buildGenderIcon(employee.gender),
-                                SizedBox(width: 4),
-                                Text(
-                                  employee.gender ?? 'N/A',
-                                  style: textStyle,
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                Icon(Icons.calendar_today,
-                                    size: 12, color: kSecondaryColor),
-                                SizedBox(width: 4),
-                                Text(
-                                  employee.joiningDate != null
-                                      ? DateFormat('dd MMM yyyy')
-                                          .format(employee.joiningDate!)
-                                      : 'N/A',
-                                  style: textStyle,
-                                ),
-                                Spacer(),
-                                GestureDetector(
-                                  onTap: () =>
-                                      _showStatusChangeConfirmation(employee),
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: (employee.status ?? false)
-                                          ? Colors.green.withOpacity(0.2)
-                                          : Colors.red.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: (employee.status ?? false)
-                                            ? Colors.green.withOpacity(0.3)
-                                            : Colors.red.withOpacity(0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          (employee.status ?? false)
-                                              ? 'Active'
-                                              : 'Inactive',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: (employee.status ?? false)
-                                                ? Colors.green[700]
-                                                : Colors.red[700],
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        SizedBox(width: 2),
-                                        Icon(
-                                          Icons.touch_app_outlined,
-                                          size: 10,
-                                          color: (employee.status ?? false)
-                                              ? Colors.green[700]
-                                              : Colors.red[700],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Three Dots Menu
-                      PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, color: kSecondaryColor),
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'view',
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.visibility_outlined,
-                                    color: kSecondaryColor),
-                                SizedBox(width: 8),
-                                Text('View'),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.edit_outlined, color: kPrimaryColor),
-                                SizedBox(width: 8),
-                                Text('Edit'),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.delete_outline, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        onSelected: (value) {
-                          switch (value) {
-                            case 'view':
-                              _showEmployeeDetailsDialog(employee);
-                              break;
-                            case 'edit':
-                              Get.toNamed(Routes.EDIT_EMPLOYEE,
-                                  arguments: {'id': employee.id.toString()});
-                              break;
-                            case 'delete':
-                              _showDeleteConfirmation(employee);
-                              break;
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                );
+                return _buildEmployeeCard(employee, index);
               },
             ),
           ),
         ),
 
-        // Pagination Controls
-        Padding(
-          padding: EdgeInsets.all(16),
+        // Compact Pagination
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: Offset(0, -2),
+              ),
+            ],
+          ),
           child: Obx(() => _buildPaginationControls()),
         ),
       ],
     );
   }
 
-  // Helper method to build gender icon
+  Widget _buildEmployeeCard(Employee employee, int index) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: backgroundColors[index % 2],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!.withOpacity(0.5)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _showEmployeeDetailsDialog(employee),
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Image with gender indicator
+                GestureDetector(
+                  onTap: () {
+                    final imageUrl = controller.getEmployeeImageUrl(employee);
+                    _showImageDialog(imageUrl);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: avatarBorderColors[index % 2],
+                        width: 2.5,
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        _buildEmployeeAvatar(employee, 48),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: _buildGenderBadge(employee.gender),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(width: 12),
+
+                // Employee Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Employee Name
+                      Text(
+                        controller.getEmployeeDisplayName(employee),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[900],
+                          fontFamily: 'NotoSansTamil',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Tamil Name
+                      if (employee.tamilName != null &&
+                          employee.tamilName!.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Text(
+                            employee.tamilName!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey[600],
+                              fontFamily: 'NotoSansTamil',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      SizedBox(height: 4),
+                      // Employee Type and Gender
+                      Row(
+                        children: [
+                          Text(
+                            employee.empType ?? 'N/A',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600]),
+                          ),
+                          Text(' • ',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600])),
+                          _buildGenderIcon(employee.gender),
+                          SizedBox(width: 3),
+                          Text(
+                            employee.gender ?? 'N/A',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      // Joining Date and Status
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: 12, color: Colors.grey[500]),
+                          SizedBox(width: 4),
+                          Text(
+                            employee.joiningDate != null
+                                ? DateFormat('dd MMM yyyy')
+                                    .format(employee.joiningDate!)
+                                : 'N/A',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600]),
+                          ),
+                          Spacer(),
+                          GestureDetector(
+                            onTap: () =>
+                                _showStatusChangeConfirmation(employee),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (employee.status ?? false)
+                                    ? Colors.green.withOpacity(0.15)
+                                    : Colors.red.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: (employee.status ?? false)
+                                      ? Colors.green.withOpacity(0.3)
+                                      : Colors.red.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    (employee.status ?? false)
+                                        ? 'Active'
+                                        : 'Inactive',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: (employee.status ?? false)
+                                          ? Colors.green[700]
+                                          : Colors.red[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Icon(
+                                    Icons.touch_app_outlined,
+                                    size: 10,
+                                    color: (employee.status ?? false)
+                                        ? Colors.green[700]
+                                        : Colors.red[700],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Menu Button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: PopupMenuButton<String>(
+                    icon:
+                        Icon(Icons.more_vert, color: kSecondaryColor, size: 18),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'view',
+                        child: Row(
+                          children: [
+                            Icon(Icons.visibility_outlined,
+                                color: kPrimaryColor, size: 18),
+                            SizedBox(width: 10),
+                            Text('View', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                color: kPrimaryColor, size: 18),
+                            SizedBox(width: 10),
+                            Text('Edit', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline,
+                                color: Colors.red, size: 18),
+                            SizedBox(width: 10),
+                            Text('Delete',
+                                style:
+                                    TextStyle(color: Colors.red, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'view':
+                          _showEmployeeDetailsDialog(employee);
+                          break;
+                        case 'edit':
+                          Get.toNamed(Routes.EDIT_EMPLOYEE,
+                              arguments: {'id': employee.id.toString()});
+                          break;
+                        case 'delete':
+                          _showDeleteConfirmation(employee);
+                          break;
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenderIcon(String? gender) {
     if (gender == null) {
-      return Icon(Icons.help_outline, size: 14, color: Colors.grey);
+      return Icon(Icons.help_outline, size: 13, color: Colors.grey);
     }
 
     String genderLower = gender.toLowerCase();
 
     if (genderLower.contains('female') || genderLower.contains('woman')) {
-      return Icon(Icons.female, size: 14, color: Colors.pink[400]);
+      return Icon(Icons.face_3, size: 13, color: Colors.pink[400]);
     } else if (genderLower.contains('male') || genderLower.contains('man')) {
-      return Icon(Icons.male, size: 14, color: Colors.blue[400]);
+      return Icon(Icons.face, size: 13, color: Colors.blue[400]);
     } else {
-      return Icon(Icons.person_outline, size: 14, color: Colors.grey);
+      return Icon(Icons.person_outline, size: 13, color: Colors.grey);
     }
   }
 
-  // Helper method to build gender badge on avatar
   Widget _buildGenderBadge(String? gender) {
     if (gender == null) {
       return SizedBox.shrink();
@@ -342,10 +441,10 @@ class ViewEmployees extends StatelessWidget {
 
     if (genderLower.contains('female') || genderLower.contains('woman')) {
       badgeColor = Colors.pink;
-      iconData = Icons.female;
+      iconData = Icons.face_3;
     } else if (genderLower.contains('male') || genderLower.contains('man')) {
       badgeColor = Colors.blue;
-      iconData = Icons.male;
+      iconData = Icons.face;
     } else {
       return SizedBox.shrink();
     }
@@ -359,7 +458,7 @@ class ViewEmployees extends StatelessWidget {
       ),
       child: Icon(
         iconData,
-        size: 12,
+        size: 11,
         color: Colors.white,
       ),
     );
@@ -373,7 +472,7 @@ class ViewEmployees extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        color: Colors.grey[200],
       ),
       child: ClipOval(
         child: imageUrl != null && imageUrl.isNotEmpty
@@ -395,7 +494,6 @@ class ViewEmployees extends StatelessWidget {
                   ),
                 ),
                 errorWidget: (context, url, error) {
-                  print('Image load error for ${employee.name}: $error');
                   return _buildAvatarFallback(employee, size);
                 },
                 httpHeaders: {
@@ -465,120 +563,167 @@ class ViewEmployees extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        ElevatedButton.icon(
-          onPressed:
-              controller.hasPrevious.value ? controller.previousPage : null,
-          icon: Icon(Icons.chevron_left, color: kLightColor),
-          label: Text('Previous'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimaryColor,
-            foregroundColor: Colors.white,
-          ),
-        ),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'Page ${controller.currentPage.value} of ${controller.totalPages.value}',
-            style: TextStyle(
-              color: kSecondaryColor,
-              fontWeight: FontWeight.w500,
+        // Previous
+        Expanded(
+          child: ElevatedButton(
+            onPressed:
+                controller.hasPrevious.value ? controller.previousPage : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: controller.hasPrevious.value
+                  ? kPrimaryColor
+                  : Colors.grey[200],
+              foregroundColor: controller.hasPrevious.value
+                  ? Colors.white
+                  : Colors.grey[400],
+              padding: EdgeInsets.symmetric(vertical: 11),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.chevron_left,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 2),
+                Text('Previous',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
             ),
           ),
         ),
-        ElevatedButton.icon(
-          onPressed: controller.hasNext.value ? controller.nextPage : null,
-          icon: Icon(Icons.chevron_right, color: kLightColor),
-          label: Text('Next'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimaryColor,
-            foregroundColor: Colors.white,
+
+        // Page Info
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${controller.currentPage.value}/${controller.totalPages.value}',
+              style: TextStyle(
+                color: kSecondaryColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+
+        // Next
+        Expanded(
+          child: ElevatedButton(
+            onPressed: controller.hasNext.value ? controller.nextPage : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  controller.hasNext.value ? kPrimaryColor : Colors.grey[200],
+              foregroundColor:
+                  controller.hasNext.value ? Colors.white : Colors.grey[400],
+              padding: EdgeInsets.symmetric(vertical: 11),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Next',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: kLightColor,
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  void _selectFromDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: controller.fromDate.value ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    controller.selectFromDate(picked);
-  }
-
-  void _selectToDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: controller.toDate.value ?? DateTime.now(),
-      firstDate: controller.fromDate.value ?? DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    controller.selectToDate(picked);
-  }
-
   void _showEmployeeDetailsDialog(Employee employee) {
     Get.dialog(
       Dialog(
         insetPadding: EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: Get.width * 0.9,
-          constraints: BoxConstraints(
-            maxHeight: Get.height * 0.8,
-          ),
+          constraints: BoxConstraints(maxHeight: Get.height * 0.85),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Header
               Container(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: kPrimaryColor,
+                  gradient: LinearGradient(
+                    colors: [kPrimaryColor, kPrimaryColor.withOpacity(0.8)],
+                  ),
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.person, color: Colors.white),
-                    SizedBox(width: 8),
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.person, color: Colors.white, size: 24),
+                    ),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Employee Details',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Get.back(),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Get.back(),
+                      ),
                     ),
                   ],
                 ),
               ),
+
+              // Content
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(
                         child: Stack(
                           children: [
-                            _buildEmployeeAvatar(employee, 120),
+                            _buildEmployeeAvatar(employee, 100),
                             Positioned(
                               bottom: 0,
                               right: 0,
                               child: Container(
-                                padding: EdgeInsets.all(4),
+                                padding: EdgeInsets.all(3),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
@@ -589,61 +734,74 @@ class ViewEmployees extends StatelessWidget {
                           ],
                         ),
                       ),
-                      SizedBox(height: 24),
-                      _buildDetailRow(
-                          'Name',
-                          controller.getEmployeeDisplayName(employee),
-                          Icons.person,
-                          useTamilFont: true),
-                      SizedBox(height: 16),
+                      SizedBox(height: 20),
+                      _buildDetailCard(
+                        'Name',
+                        controller.getEmployeeDisplayName(employee),
+                        Icons.person,
+                        useTamilFont: true,
+                      ),
+                      SizedBox(height: 12),
                       if (employee.tamilName != null &&
                           employee.tamilName!.isNotEmpty)
-                        _buildDetailRow(
-                            'Tamil Name', employee.tamilName!, Icons.translate,
-                            useTamilFont: true),
-                      SizedBox(height: 16),
-                      _buildDetailRow(
-                          'Joining Date',
-                          employee.joiningDate != null
-                              ? DateFormat('dd MMM yyyy')
-                                  .format(employee.joiningDate!)
-                              : 'N/A',
-                          Icons.calendar_today),
-                      SizedBox(height: 16),
-                      _buildDetailRow('Employee Type',
-                          employee.empType ?? 'N/A', Icons.work),
-                      SizedBox(height: 16),
-                      _buildDetailRowWithGender(
-                          'Gender', employee.gender ?? 'N/A', employee.gender),
-                      SizedBox(height: 16),
-                      _buildDetailRow(
-                          'Contact', employee.contact ?? 'N/A', Icons.phone),
-                      SizedBox(height: 16),
-                      _buildDetailRow(
-                          'Status',
-                          (employee.status ?? false) ? 'Active' : 'Inactive',
-                          Icons.info_outline,
-                          valueColor: (employee.status ?? false)
-                              ? Colors.green
-                              : Colors.red,
-                          valueStyle: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: (employee.status ?? false)
-                                ? Colors.green
-                                : Colors.red,
-                          )),
+                        _buildDetailCard(
+                          'Tamil Name',
+                          employee.tamilName!,
+                          Icons.translate,
+                          useTamilFont: true,
+                        ),
+                      if (employee.tamilName != null &&
+                          employee.tamilName!.isNotEmpty)
+                        SizedBox(height: 12),
+                      _buildDetailCard(
+                        'Joining Date',
+                        employee.joiningDate != null
+                            ? DateFormat('dd MMM yyyy')
+                                .format(employee.joiningDate!)
+                            : 'N/A',
+                        Icons.calendar_today,
+                      ),
+                      SizedBox(height: 12),
+                      _buildDetailCard(
+                        'Employee Type',
+                        employee.empType ?? 'N/A',
+                        Icons.work,
+                      ),
+                      SizedBox(height: 12),
+                      _buildDetailCardWithGender(
+                        'Gender',
+                        employee.gender ?? 'N/A',
+                        employee.gender,
+                      ),
+                      SizedBox(height: 12),
+                      _buildDetailCard(
+                        'Contact',
+                        employee.contact ?? 'N/A',
+                        Icons.phone,
+                      ),
+                      SizedBox(height: 12),
+                      _buildDetailCard(
+                        'Status',
+                        (employee.status ?? false) ? 'Active' : 'Inactive',
+                        Icons.info_outline,
+                        highlight: true,
+                        highlightColor: (employee.status ?? false)
+                            ? Colors.green
+                            : Colors.red,
+                      ),
                     ],
                   ),
                 ),
               ),
+
+              // Actions
               Container(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -652,14 +810,18 @@ class ViewEmployees extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Get.back();
-                          Get.snackbar('Info', 'Edit functionality');
+                          Get.toNamed(Routes.EDIT_EMPLOYEE,
+                              arguments: {'id': employee.id.toString()});
                         },
-                        icon: Icon(Icons.edit_outlined, color: kPrimaryColor),
-                        label:
-                            Text('Edit', style: TextStyle(color: kBlackColor)),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: kPrimaryColor),
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                        icon: Icon(Icons.edit_outlined, color: kLightColor),
+                        label: Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
                         ),
                       ),
                     ),
@@ -670,14 +832,17 @@ class ViewEmployees extends StatelessWidget {
                           Get.back();
                           _showDeleteConfirmation(employee);
                         },
-                        icon: Icon(Icons.delete_outline, color: Colors.red),
-                        label: Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: kRed,
                         ),
+                        label: Text('Delete'),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.red),
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                          foregroundColor: Colors.red,
+                          side: BorderSide(color: Colors.red, width: 1.5),
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
@@ -691,25 +856,46 @@ class ViewEmployees extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(
+  Widget _buildDetailCard(
     String label,
     String value,
     IconData icon, {
-    Color? valueColor,
-    TextStyle? valueStyle,
+    bool highlight = false,
+    Color? highlightColor,
     bool useTamilFont = false,
   }) {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        color: highlight
+            ? (highlightColor ?? kPrimaryColor).withOpacity(0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: highlight
+              ? (highlightColor ?? kPrimaryColor).withOpacity(0.3)
+              : Colors.grey[200]!,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: kSecondaryColor, size: 20),
-          SizedBox(width: 12),
+          Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: highlight
+                  ? (highlightColor ?? kPrimaryColor).withOpacity(0.15)
+                  : Colors.grey[100],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: highlight
+                  ? (highlightColor ?? kPrimaryColor)
+                  : kSecondaryColor,
+              size: 22,
+            ),
+          ),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,13 +911,14 @@ class ViewEmployees extends StatelessWidget {
                 SizedBox(height: 4),
                 Text(
                   value,
-                  style: valueStyle ??
-                      TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: valueColor ?? Colors.black87,
-                        fontFamily: useTamilFont ? 'NotoSansTamil' : null,
-                      ),
+                  style: TextStyle(
+                    fontSize: highlight ? 16 : 15,
+                    fontWeight: highlight ? FontWeight.bold : FontWeight.w600,
+                    color: highlight
+                        ? (highlightColor ?? kPrimaryColor)
+                        : Colors.grey[900],
+                    fontFamily: useTamilFont ? 'NotoSansTamil' : null,
+                  ),
                 ),
               ],
             ),
@@ -741,22 +928,29 @@ class ViewEmployees extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRowWithGender(
+  Widget _buildDetailCardWithGender(
     String label,
     String value,
     String? gender,
   ) {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: Row(
         children: [
-          _buildGenderIcon(gender),
-          SizedBox(width: 12),
+          Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: _buildGenderIcon(gender),
+          ),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,9 +967,9 @@ class ViewEmployees extends StatelessWidget {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Colors.grey[900],
                   ),
                 ),
               ],
@@ -793,73 +987,63 @@ class ViewEmployees extends StatelessWidget {
         'No profile image available for this employee',
         backgroundColor: Colors.orange,
         colorText: Colors.white,
+        borderRadius: 12,
+        margin: EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
       );
       return;
     }
 
     Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: Get.width * 0.8,
-                  maxHeight: Get.height * 0.6,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (context, url) => Container(
-                      width: 200,
-                      height: 200,
-                      child: Center(
-                        child: CircularProgressIndicator(color: kPrimaryColor),
+      Dialog.fullscreen(
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => Center(
+                        child: CircularProgressIndicator(color: Colors.white),
                       ),
+                      errorWidget: (context, url, error) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  size: 50, color: Colors.white),
+                              SizedBox(height: 16),
+                              Text('Failed to load image',
+                                  style: TextStyle(color: Colors.white)),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    errorWidget: (context, url, error) {
-                      return Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline,
-                                size: 48, color: Colors.grey[600]),
-                            SizedBox(height: 8),
-                            Text('Failed to load image',
-                                style: TextStyle(color: Colors.grey[600])),
-                          ],
-                        ),
-                      );
-                    },
                   ),
                 ),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Get.back(),
-                child: Text('Close'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Get.back(),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -874,232 +1058,313 @@ class ViewEmployees extends StatelessWidget {
     IconData actionIcon = currentStatus ? Icons.toggle_off : Icons.toggle_on;
 
     Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: Row(
-          children: [
-            Icon(actionIcon, color: actionColor, size: 28),
-            SizedBox(width: 8),
-            Text('$actionText Employee'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to $statusText this employee?'),
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: actionColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(actionIcon, size: 48, color: actionColor),
               ),
-              child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      _buildEmployeeAvatar(employee, 40),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: _buildGenderBadge(employee.gender),
-                      ),
-                    ],
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              SizedBox(height: 20),
+              Text(
+                '$actionText Employee',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[900],
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Are you sure you want to $statusText this employee?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Stack(
                       children: [
-                        Text(
-                          controller.getEmployeeDisplayName(employee),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'NotoSansTamil',
-                          ),
-                        ),
-                        if (employee.tamilName != null &&
-                            employee.tamilName!.isNotEmpty)
-                          Text(
-                            employee.tamilName!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
-                              fontFamily: 'NotoSansTamil',
-                            ),
-                          ),
-                        SizedBox(height: 4),
-                        Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: currentStatus
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.red.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Current: ${currentStatus ? "Active" : "Inactive"}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: currentStatus
-                                  ? Colors.green[700]
-                                  : Colors.red[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        _buildEmployeeAvatar(employee, 40),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: _buildGenderBadge(employee.gender),
                         ),
                       ],
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            controller.getEmployeeDisplayName(employee),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontFamily: 'NotoSansTamil',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (employee.tamilName != null &&
+                              employee.tamilName!.isNotEmpty)
+                            Text(
+                              employee.tamilName!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                                fontFamily: 'NotoSansTamil',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          SizedBox(height: 4),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: currentStatus
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.red.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Current: ${currentStatus ? "Active" : "Inactive"}',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: currentStatus
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.arrow_forward, size: 16, color: Colors.grey[600]),
+                  SizedBox(width: 6),
+                  Text(
+                    'Will become: ${!currentStatus ? "Active" : "Inactive"}',
+                    style: TextStyle(
+                      color:
+                          !currentStatus ? Colors.green[700] : Colors.red[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.arrow_forward, size: 16, color: Colors.grey[600]),
-                SizedBox(width: 4),
-                Text(
-                  'Will become: ${!currentStatus ? "Active" : "Inactive"}',
-                  style: TextStyle(
-                    color: !currentStatus ? Colors.green[700] : Colors.red[700],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+              SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('Cancel',
+                          style: TextStyle(color: Colors.grey[700])),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                        controller.toggleEmployeeStatus(employee.id,
+                            newStatus: !currentStatus);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: actionColor,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: Text(actionText,
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Cancel'),
-            style: TextButton.styleFrom(
-              foregroundColor: kSecondaryColor,
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.toggleEmployeeStatus(employee.id,
-                  newStatus: !currentStatus);
-            },
-            child: Text(actionText),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: actionColor,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
       ),
     );
   }
 
   void _showDeleteConfirmation(Employee employee) {
     Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 28),
-            SizedBox(width: 8),
-            Text('Confirm Deletion'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to delete this employee?'),
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.delete_outline, size: 48, color: Colors.red),
               ),
-              child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      _buildEmployeeAvatar(employee, 40),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: _buildGenderBadge(employee.gender),
+              SizedBox(height: 20),
+              Text(
+                'Delete Employee?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[900],
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Are you sure you want to delete this employee?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Stack(
+                      children: [
+                        _buildEmployeeAvatar(employee, 40),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: _buildGenderBadge(employee.gender),
+                        ),
+                      ],
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            controller.getEmployeeDisplayName(employee),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontFamily: 'NotoSansTamil',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (employee.tamilName != null &&
+                              employee.tamilName!.isNotEmpty)
+                            Text(
+                              employee.tamilName!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                                fontFamily: 'NotoSansTamil',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'This action cannot be undone.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.red[600],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('Cancel',
+                          style: TextStyle(color: Colors.grey[700])),
+                    ),
                   ),
                   SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          controller.getEmployeeDisplayName(employee),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            fontFamily: 'NotoSansTamil',
-                          ),
-                        ),
-                        if (employee.tamilName != null &&
-                            employee.tamilName!.isNotEmpty)
-                          Text(
-                            employee.tamilName!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
-                              fontFamily: 'NotoSansTamil',
-                            ),
-                          ),
-                      ],
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                        controller.deleteEmployee(employee.id ?? '');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: Text('Delete',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'This action cannot be undone.',
-              style: TextStyle(
-                color: Colors.red[600],
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Cancel'),
-            style: TextButton.styleFrom(
-              foregroundColor: kSecondaryColor,
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.deleteEmployee(employee.id ?? '');
-            },
-            child: Text('Delete'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
       ),
     );
   }

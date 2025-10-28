@@ -318,13 +318,11 @@ class EditExpenseController extends GetxController {
         imageBytes: image.value,
       );
 
-      // Debug print to see the actual response
       print('Service response: $result');
 
       // Check for success with multiple possible formats
       bool isSuccess = false;
       if (result != null) {
-        // Handle different response formats
         if (result['success'] == true ||
             result['success'] == 'true' ||
             result['status'] == 'success' ||
@@ -333,6 +331,8 @@ class EditExpenseController extends GetxController {
         }
       }
 
+      isSaving.value = false;
+
       if (isSuccess) {
         // Update current expense with response data if available
         final responseData = result['data'];
@@ -340,40 +340,17 @@ class EditExpenseController extends GetxController {
           currentExpense.value = ExpenseModel.fromJson(responseData);
         }
 
-        // Stop loading before showing success message
-        isSaving.value = false;
-
-        // Wait a bit to ensure UI is updated
-        await Future.delayed(Duration(milliseconds: 100));
-
-        // Show success message with longer duration
-        Get.snackbar(
-          'Success',
-          result['message'] ?? 'Expense updated successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: Duration(seconds: 3),
-          margin: EdgeInsets.all(16),
-          borderRadius: 8,
-          isDismissible: true,
-          dismissDirection: DismissDirection.horizontal,
-          forwardAnimationCurve: Curves.easeOutBack,
-          reverseAnimationCurve: Curves.easeInBack,
+        // ✅ Navigate back with success arguments - let the expenses page show the message
+        Get.offAllNamed(
+          Routes.EXPENSES,
+          arguments: {
+            'refresh': true,
+            'showSuccess': true,
+            'message': result['message'] ?? 'Expense updated successfully',
+          },
         );
-        CustomSnackbar.showSuccess(
-          title: 'Success',
-          message: result['message'] ?? 'Expense updated successfully',
-        );
-
-        // Wait for snackbar to show before navigating
-        await Future.delayed(Duration(milliseconds: 1500));
-
-        // Navigate back with success result
-        Get.offAllNamed(Routes.EXPENSES, arguments: true);
       } else {
-        // Handle error case
-
+        // ✅ Only show error messages here
         CustomSnackbar.showError(
           title: 'Error',
           message: result['message'] ?? 'Failed to update expense',

@@ -64,7 +64,7 @@ class AttendanceUIScreen extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 controller.fromDate.value != null
-                                    ? DateFormat('dd/MM/yyyy')
+                                    ? DateFormat('dd MMM yyyy')
                                         .format(controller.fromDate.value!)
                                     : 'From Date',
                                 style: const TextStyle(fontSize: 12),
@@ -97,7 +97,7 @@ class AttendanceUIScreen extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 controller.toDate.value != null
-                                    ? DateFormat('dd/MM/yyyy')
+                                    ? DateFormat('dd MMM yyyy')
                                         .format(controller.toDate.value!)
                                     : 'To Date',
                                 style: const TextStyle(fontSize: 12),
@@ -222,25 +222,20 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-  // FIXED: Updated wages summary to properly handle individual payments
   Widget _buildWagesSummaryAndActions(AttendanceUIController controller) {
     return Obx(() {
-      // Calculate total paid amount across all employees
       double totalPaidAmount = 0.0;
       for (var employee in controller.employees) {
         totalPaidAmount += controller.getPartialPayment(employee.id);
       }
 
-      // Calculate remaining amount
       double remainingAmount =
           controller.grandTotalWages.value - totalPaidAmount;
 
-      // Check if ALL employees are fully paid
       bool allEmployeesPaid = controller.employees.isNotEmpty &&
           controller.employees.every(
               (employee) => controller.getRemainingAmount(employee.id) <= 0);
 
-      // Check if there are any employees with remaining amounts > 0
       bool hasUnpaidEmployees = controller.employees
           .any((employee) => controller.getRemainingAmount(employee.id) > 0);
 
@@ -248,7 +243,6 @@ class AttendanceUIScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
         child: Column(
           children: [
-            // Total wages info with breakdown
             Card(
               elevation: 1,
               child: Padding(
@@ -296,7 +290,6 @@ class AttendanceUIScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Progress indicator for payment completion
                         if (controller.grandTotalWages.value > 0)
                           SizedBox(
                             width: 40,
@@ -330,13 +323,11 @@ class AttendanceUIScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Action buttons with better state management
             Row(
               children: [
                 Expanded(
-                  child: Container(), // Empty space
+                  child: Container(),
                 ),
-                // Show pay remaining button only when there are unpaid employees
                 if (hasUnpaidEmployees && remainingAmount > 0)
                   ElevatedButton.icon(
                     onPressed: () =>
@@ -404,7 +395,6 @@ class AttendanceUIScreen extends StatelessWidget {
     });
   }
 
-  // FIXED: Updated pay wages dialog to handle remaining amounts properly
   void _showPayWagesDialog(
       AttendanceUIController controller, double remainingAmount) {
     Get.dialog(
@@ -447,7 +437,6 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-  // FIXED: New method to handle paying remaining amount
   void _showPayAllRemainingConfirmation(
       AttendanceUIController controller, double remainingAmount) {
     Get.dialog(
@@ -464,41 +453,6 @@ class AttendanceUIScreen extends StatelessWidget {
             onPressed: () {
               Get.back();
               controller.payAllWages();
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _payRemainingWages(AttendanceUIController controller) async {
-    // Make a copy to avoid modification issues
-    final employeesCopy = List.of(controller.employees);
-
-    for (var employee in employeesCopy) {
-      final remainingAmount = controller.getRemainingAmount(employee.id);
-      if (remainingAmount > 0) {
-        await controller.payEmployeeWages(employee.id, remainingAmount);
-      }
-    }
-  }
-
-  void _showPayAllConfirmation(AttendanceUIController controller) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Confirm Payment'),
-        content: Text(
-            'Are you sure you want to pay all wages totaling ₹${controller.grandTotalWages.value.toStringAsFixed(0)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.payAllWages(); // ← Make sure this calls the new method
             },
             child: const Text('Confirm'),
           ),
@@ -748,7 +702,6 @@ class AttendanceUIScreen extends StatelessWidget {
                     controller.getRemainingAmount(employee.id);
 
                 return DataRow(cells: [
-                  // Employee name cell
                   DataCell(
                     Container(
                       width: 80,
@@ -778,18 +731,13 @@ class AttendanceUIScreen extends StatelessWidget {
                     onTap: () => _navigateToEmployeeDetails(employee),
                   ),
 
-                  // Attendance cells for each day of the week
+                  // OPTIMIZED: Fast attendance marking cells
                   ...daysOfWeek.map((date) {
-                    // Normalize the date to remove time component
                     final normalizedDate =
                         DateTime(date.year, date.month, date.day);
                     final attendanceStatus = controller
                         .attendanceRecords[employee.id]?[normalizedDate];
                     final isToday = _isToday(date);
-
-                    // Debug print to see what status we're getting
-                    print(
-                        'Employee: ${employee.name}, Date: $normalizedDate, Status: $attendanceStatus, Records: ${controller.attendanceRecords[employee.id]?.keys.toList()}');
 
                     return DataCell(
                       Container(
@@ -800,12 +748,6 @@ class AttendanceUIScreen extends StatelessWidget {
                               ? Colors.yellow[100]
                               : _getAttendanceBackgroundColor(attendanceStatus),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: isToday
-                                ? Colors.orange
-                                : _getAttendanceBorderColor(attendanceStatus),
-                            width: 1,
-                          ),
                         ),
                         child: Center(
                           child: _getAttendanceIcon(attendanceStatus),
@@ -813,11 +755,9 @@ class AttendanceUIScreen extends StatelessWidget {
                       ),
                       onTap: () {
                         if (!controller.wagesPaid.value) {
-                          // Toggle between 0 (absent) and 1 (present)
+                          // INSTANT UPDATE: Toggle immediately without loader
                           final newStatus = (attendanceStatus == 1) ? 0 : 1;
-                          print(
-                              'Updating attendance: ${employee.name}, $normalizedDate, $attendanceStatus -> $newStatus');
-                          controller.updateAttendance(
+                          controller.updateAttendanceInstant(
                             employee.id,
                             employee.name,
                             normalizedDate,
@@ -830,7 +770,6 @@ class AttendanceUIScreen extends StatelessWidget {
                     );
                   }),
 
-                  // Wages cell
                   DataCell(
                     SizedBox(
                       width: 50,
@@ -862,7 +801,6 @@ class AttendanceUIScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Status cell
                   DataCell(
                     SizedBox(
                       width: 40,
@@ -899,7 +837,6 @@ class AttendanceUIScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Action cell
                   DataCell(
                     SizedBox(
                       width: 35,
@@ -980,45 +917,33 @@ class AttendanceUIScreen extends StatelessWidget {
     }
   }
 
-  Color _getAttendanceBorderColor(int? status) {
-    switch (status) {
-      case 1:
-        return Colors.green;
-      case 2:
-        return Colors.orange;
-      case 0:
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
+  // IMPROVED: Removed border, changed question mark to close icon
   Widget _getAttendanceIcon(int? status) {
     switch (status) {
       case 1:
         return const Icon(
           Icons.check,
-          size: 12,
+          size: 14,
           color: Colors.green,
         );
       case 2:
         return const Icon(
           Icons.close,
-          size: 12,
+          size: 14,
           color: Colors.orange,
         );
       case 0:
         return const Icon(
           Icons.close,
-          size: 12,
+          size: 14,
           color: Colors.red,
         );
       default:
-        // This handles null status - means attendance not marked yet
-        return const Icon(
-          Icons.help_outline,
-          size: 12,
-          color: Colors.grey,
+        // Changed from help_outline to close
+        return Icon(
+          Icons.close,
+          size: 14,
+          color: Colors.grey[400],
         );
     }
   }
@@ -1044,12 +969,9 @@ class AttendanceUIScreen extends StatelessWidget {
 
   void _navigateToEmployeeDetails(employee) {
     try {
-      // Clean up any existing controller before navigation
       if (Get.isRegistered<EmployeeDetailsController>()) {
         Get.delete<EmployeeDetailsController>();
       }
-
-      // Navigate with employee data
       Get.toNamed(Routes.EMPLOYEE_DETAILS, arguments: employee);
     } catch (e) {
       print('Navigation error: $e');
@@ -1108,7 +1030,6 @@ class AttendanceUIScreen extends StatelessWidget {
     );
   }
 
-// FIXED: Updated pay full confirmation dialog to use remaining amount
   void _showPayFullConfirmation(
       AttendanceUIController controller, employee, double remainingAmount) {
     Get.dialog(
@@ -1134,83 +1055,99 @@ class AttendanceUIScreen extends StatelessWidget {
   }
 
   Widget _buildEmployeeCounts(AttendanceUIController controller) {
-    final daysOfWeek = List.generate(
-        7,
-        (index) =>
-            controller.selectedWeekStart.value.add(Duration(days: index)));
-    final abbreviatedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          Text(
-            'Weekly Employee Count: ${controller.weeklyEmployeeCount.value}',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          Obx(() => Text(
+                'Weekly Employee Count: ${controller.weeklyEmployeeCount.value}',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              )),
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: daysOfWeek.asMap().entries.map((entry) {
-                final index = entry.key;
-                final date = entry.value;
-                final count = controller.dailyEmployeeCount[date] ?? 0;
+          Obx(() {
+            // Force rebuild when dailyEmployeeCount changes
+            final _ = controller.dailyEmployeeCount.keys.length;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: kPrimaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              abbreviatedDays[index],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+            final daysOfWeek = List.generate(
+                7,
+                (index) => controller.selectedWeekStart.value
+                    .add(Duration(days: index)));
+            final abbreviatedDays = [
+              'Mon',
+              'Tue',
+              'Wed',
+              'Thu',
+              'Fri',
+              'Sat',
+              'Sun'
+            ];
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: daysOfWeek.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final date = entry.value;
+
+                  // ✅ Use the safe helper method with normalization
+                  final count = controller.getDailyEmployeeCountSafe(date);
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                abbreviatedDays[index],
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            Text(
-                              DateFormat('dd').format(date),
-                              style: const TextStyle(
-                                fontSize: 8,
-                                color: Colors.grey,
+                              Text(
+                                DateFormat('dd').format(date),
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: kPrimaryColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          count.toString(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            count.toString(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          }),
           const SizedBox(height: 16),
           _buildPaymentSummary(controller),
         ],
@@ -1224,7 +1161,6 @@ class AttendanceUIScreen extends StatelessWidget {
     int partiallyPaidEmployees = 0;
     double totalPaidAmount = 0.0;
 
-    // Calculate payment statistics
     for (var employee in controller.employees) {
       final paymentStatus = controller.getPaymentStatus(employee.id);
       final partialPayment = controller.getPartialPayment(employee.id);
@@ -1354,17 +1290,5 @@ class AttendanceUIScreen extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  void _navigateWithCleanup(employee) {
-    try {
-      // Navigate with a delay to ensure clean state
-      Future.microtask(() {
-        Get.toNamed(Routes.EMPLOYEE_DETAILS, arguments: employee);
-      });
-    } catch (e) {
-      print('Navigation error: $e');
-      Get.snackbar('Error', 'Failed to navigate to employee details');
-    }
   }
 }

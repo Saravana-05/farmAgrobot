@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'dart:io';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
+import '../../../global_widgets/custom_snackbar/flash_message.dart';
 import '../../../global_widgets/custom_snackbar/snackbar.dart';
 import '../../../routes/app_pages.dart';
 
@@ -38,8 +39,27 @@ class ExpensesViewController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadExpenses(showMessages: false); // Don't show messages on init
-    refreshExpenses(showMessages: false); // Don't show messages on init
+
+    // Load expenses
+    loadExpenses(showMessages: false);
+
+    // Check for success message from navigation with proper type checking
+    if (Get.arguments != null) {
+      // ✅ Check if arguments is actually a Map before casting
+      if (Get.arguments is Map<String, dynamic>) {
+        final args = Get.arguments as Map<String, dynamic>;
+
+        if (args['showSuccess'] == true) {
+          // Show success message with a slight delay for smooth transition
+          Future.delayed(const Duration(milliseconds: 500), () {
+            CustomFlashMessage.showSuccess(
+              title: 'Success',
+              message: args['message'] ?? 'Expense added successfully',
+            );
+          });
+        }
+      }
+    }
   }
 
   void onRouteBack() {
@@ -111,13 +131,15 @@ class ExpensesViewController extends GetxController {
       } else {
         // Only show error messages when explicitly requested
         if (showMessages) {
-          CustomSnackbar.showError(title: 'Error', message: response['message']);
+          CustomSnackbar.showError(
+              title: 'Error', message: response['message']);
         }
       }
     } catch (e) {
       // Only show error messages when explicitly requested
       if (showMessages) {
-        CustomSnackbar.showError(title: 'Error', message: 'Failed to load expenses');
+        CustomSnackbar.showError(
+            title: 'Error', message: 'Failed to load expenses');
       }
       print('Load expenses error: $e'); // Keep console logging for debugging
     } finally {
@@ -242,7 +264,8 @@ class ExpensesViewController extends GetxController {
       }
 
       // Get all expenses for export
-      List<ExpenseModel> allExpensesForExport = await _getAllExpensesForExport();
+      List<ExpenseModel> allExpensesForExport =
+          await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
         CustomSnackbar.showError(
@@ -383,20 +406,18 @@ class ExpensesViewController extends GetxController {
       bool hasPermission = await _requestStoragePermission();
       if (!hasPermission) {
         CustomSnackbar.showError(
-          title: 'Permission Required', 
-          message: 'Storage permission is needed to save the file'
-        );
+            title: 'Permission Required',
+            message: 'Storage permission is needed to save the file');
         return;
       }
 
       // Get all expenses for export
-      List<ExpenseModel> allExpensesForExport = await _getAllExpensesForExport();
+      List<ExpenseModel> allExpensesForExport =
+          await _getAllExpensesForExport();
 
       if (allExpensesForExport.isEmpty) {
         CustomSnackbar.showError(
-          title: 'No Data', 
-          message: 'No expenses found to export'
-        );
+            title: 'No Data', message: 'No expenses found to export');
         return;
       }
 
@@ -479,7 +500,8 @@ class ExpensesViewController extends GetxController {
                     pw.Column(
                       children: [
                         pw.Text('Total Expenses',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text('${allExpensesForExport.length}',
                             style: pw.TextStyle(fontSize: 16)),
                       ],
@@ -487,7 +509,8 @@ class ExpensesViewController extends GetxController {
                     pw.Column(
                       children: [
                         pw.Text('Total Amount',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text('₹${_getSafeTotalAmount()}',
                             style: pw.TextStyle(
                                 fontSize: 16, color: PdfColors.green800)),
@@ -538,7 +561,8 @@ class ExpensesViewController extends GetxController {
                       ),
                       children: [
                         _buildTableCell('${index + 1}'),
-                        _buildTableCell(_formatExpenseDate(expense.expenseDate)),
+                        _buildTableCell(
+                            _formatExpenseDate(expense.expenseDate)),
                         _buildTableCell(
                             _getSafeString(expense.expenseName, 'No Name')),
                         _buildTableCell(_getSafeString(
@@ -803,7 +827,8 @@ class ExpensesViewController extends GetxController {
     toDate.value = null;
     searchKeyword.value = '';
     currentPage.value = 1;
-    loadExpenses(showMessages: false); // Don't show messages for filter clearing
+    loadExpenses(
+        showMessages: false); // Don't show messages for filter clearing
   }
 
   String formatTimestamp(dynamic date) {

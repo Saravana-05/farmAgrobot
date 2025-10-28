@@ -51,58 +51,8 @@ class ViewMerchants extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    // Add Merchant Button
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => Get.toNamed(Routes.ADD_MERCHANT),
-                        icon: Icon(Icons.add, color: Colors.white),
-                        label: Text(
-                          'Add New Merchant',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimaryColor,
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-
-                    // Refresh Button
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Obx(() => controller.isLoading.value
-                          ? Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: kPrimaryColor,
-                                ),
-                              ),
-                            )
-                          : IconButton(
-                              onPressed: controller.refreshMerchants,
-                              icon: Icon(Icons.refresh, color: kPrimaryColor),
-                            )),
-                    ),
-                  ],
-                ),
-
                 // Summary Information
-                SizedBox(height: 16),
+
                 Obx(() => Container(
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -190,7 +140,8 @@ class ViewMerchants extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: kPrimaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: kPrimaryColor.withOpacity(0.3)),
+                          border:
+                              Border.all(color: kPrimaryColor.withOpacity(0.3)),
                         ),
                         child: Icon(
                           Icons.store,
@@ -215,7 +166,8 @@ class ViewMerchants extends StatelessWidget {
                             SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                                Icon(Icons.location_on,
+                                    size: 14, color: Colors.grey[600]),
                                 SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
@@ -230,10 +182,12 @@ class ViewMerchants extends StatelessWidget {
                             SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                                Icon(Icons.phone,
+                                    size: 14, color: Colors.grey[600]),
                                 SizedBox(width: 4),
                                 Text(
-                                  controller.formatContactNumber(merchant.contact),
+                                  controller
+                                      .formatContactNumber(merchant.contact),
                                   style: textStyle,
                                 ),
                               ],
@@ -241,12 +195,15 @@ class ViewMerchants extends StatelessWidget {
                             SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.payment, size: 14, color: Colors.grey[600]),
+                                Icon(Icons.payment,
+                                    size: 14, color: Colors.grey[600]),
                                 SizedBox(width: 4),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _getPaymentTermsColor(merchant.paymentTerms),
+                                    color: _getPaymentTermsColor(
+                                        merchant.paymentTerms),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -283,7 +240,8 @@ class ViewMerchants extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: const [
-                                Icon(Icons.visibility_outlined, color: kPrimaryColor),
+                                Icon(Icons.visibility_outlined,
+                                    color: kPrimaryColor),
                                 SizedBox(width: 8),
                                 Text('View'),
                               ],
@@ -508,7 +466,8 @@ class ViewMerchants extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.payment, color: kSecondaryColor, size: 20),
+                            Icon(Icons.payment,
+                                color: kSecondaryColor, size: 20),
                             SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -524,13 +483,16 @@ class ViewMerchants extends StatelessWidget {
                                   ),
                                   SizedBox(height: 4),
                                   Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: _getPaymentTermsColor(merchant.paymentTerms),
+                                      color: _getPaymentTermsColor(
+                                          merchant.paymentTerms),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Text(
-                                      controller.getPaymentTermsDisplayName(merchant.paymentTerms),
+                                      controller.getPaymentTermsDisplayName(
+                                          merchant.paymentTerms),
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
@@ -588,7 +550,8 @@ class ViewMerchants extends StatelessWidget {
                           controller.handleEditMerchant(merchant);
                         },
                         icon: Icon(Icons.edit_outlined, color: kPrimaryColor),
-                        label: Text('Edit', style: TextStyle(color: kBlackColor)),
+                        label:
+                            Text('Edit', style: TextStyle(color: kBlackColor)),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: kPrimaryColor),
                           padding: EdgeInsets.symmetric(vertical: 12),
@@ -675,7 +638,8 @@ class ViewMerchants extends StatelessWidget {
     Get.dialog(
       AlertDialog(
         title: Text("Confirm Deletion"),
-        content: Text("Are you sure you want to delete '${merchant.name}'?\n\nThis action cannot be undone."),
+        content: Text(
+            "Are you sure you want to delete '${merchant.name}'?\n\nThis action cannot be undone."),
         actions: [
           TextButton(
             onPressed: () => Get.back(),

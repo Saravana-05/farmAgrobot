@@ -92,7 +92,7 @@ class CustomFlashMessage {
     );
   }
 
-  /// Private method to show the flash message overlay
+  /// ✅ FIXED: Private method to show the flash message overlay
   static void _showFlashMessage({
     required String title,
     required String message,
@@ -102,8 +102,24 @@ class CustomFlashMessage {
     Duration? duration,
     EdgeInsets? margin,
   }) {
-    final context = Get.context;
-    if (context == null) return;
+    // ✅ Use Get.overlayContext instead of Get.context
+    final context = Get.overlayContext;
+    
+    // ✅ If no overlay context, delay until it's ready
+    if (context == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFlashMessage(
+          title: title,
+          message: message,
+          backgroundColor: backgroundColor,
+          icon: icon,
+          textColor: textColor,
+          duration: duration,
+          margin: margin,
+        );
+      });
+      return;
+    }
 
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
@@ -116,7 +132,11 @@ class CustomFlashMessage {
         icon: icon,
         textColor: textColor ?? Colors.white,
         margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 50),
-        onDismiss: () => overlayEntry.remove(),
+        onDismiss: () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        },
       ),
     );
 

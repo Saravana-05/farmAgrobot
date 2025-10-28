@@ -73,8 +73,29 @@ class AttendanceData {
     if (json['attendance'] != null) {
       print('Attendance data exists: ${json['attendance']}');
       Map<String, dynamic> attendance = json['attendance'];
-      attendance.forEach((date, status) {
-        attendanceMap[date] = status;
+      attendance.forEach((date, value) {
+        // Handle different value types from API
+        if (value == null) {
+          attendanceMap[date] = null;
+        } else if (value is int) {
+          attendanceMap[date] = value;
+        } else if (value is String) {
+          attendanceMap[date] = int.tryParse(value);
+        } else if (value is Map) {
+          // API returns attendance as object with 'status' field
+          final statusValue = value['status'];
+          if (statusValue == null) {
+            attendanceMap[date] = null;
+          } else if (statusValue is int) {
+            attendanceMap[date] = statusValue;
+          } else if (statusValue is String) {
+            attendanceMap[date] = int.tryParse(statusValue);
+          } else if (statusValue is double) {
+            attendanceMap[date] = statusValue.toInt();
+          }
+        } else if (value is double) {
+          attendanceMap[date] = value.toInt();
+        }
       });
       print('Parsed attendance entries: ${attendanceMap.length}');
     }
@@ -93,6 +114,9 @@ class AttendanceData {
     );
 
     print('✅ AttendanceData created for: ${result.employeeName}');
+    print('   Payment Status: ${result.paymentStatus}');
+    print('   Partial Payment: ₹${result.partialPayment}');
+    print('   Remaining: ₹${result.remainingAmount}');
     return result;
   }
 }

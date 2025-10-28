@@ -12,7 +12,7 @@ class EditExpense extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-     final controller = Get.put(EditExpenseController());
+    final controller = Get.put(EditExpenseController());
 
     return Scaffold(
       appBar: MenuAppBar(
@@ -43,7 +43,7 @@ class EditExpense extends StatelessWidget {
             ),
           );
         }
-        
+
         return SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -91,6 +91,8 @@ class EditExpense extends StatelessWidget {
                       onPressed: controller.isSaving.value
                           ? () {}
                           : () => controller.updateExpense(),
+                      backgroundColor: kPrimaryColor,
+                      textColor: kLightColor,
                     ))
               ],
             ),

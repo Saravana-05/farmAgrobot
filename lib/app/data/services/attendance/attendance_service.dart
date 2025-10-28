@@ -37,29 +37,55 @@ class AttendanceService {
           // 🔍 DEBUG: Print the response structure
           print('=== API RESPONSE DEBUG ===');
           print('Response keys: ${responseData.keys}');
-          print('Response type: ${responseData.runtimeType}');
+
+          // CRITICAL: Print payment-related fields
+          if (responseData['employees'] is List) {
+            List employees = responseData['employees'];
+            print('Total employees in response: ${employees.length}');
+
+            // Print detailed info for first 3 employees
+            for (int i = 0; i < employees.length && i < 3; i++) {
+              final emp = employees[i];
+              print('--- Employee $i Debug ---');
+              print('  ID: ${emp['employee_id']}');
+              print('  Name: ${emp['employee_name']}');
+              print('  Payment Status: ${emp['payment_status']}');
+              print('  Partial Payment: ${emp['partial_payment']}');
+              print('  Remaining Amount: ${emp['remaining_amount']}');
+              print('  Total Wages: ${emp['total_wages']}');
+              print('  All Keys: ${emp.keys}');
+            }
+
+            // Count employees by payment status
+            int paid =
+                employees.where((e) => e['payment_status'] == 'paid').length;
+            int partial =
+                employees.where((e) => e['payment_status'] == 'partial').length;
+            int pending =
+                employees.where((e) => e['payment_status'] == 'pending').length;
+
+            print('Payment Status Summary:');
+            print('  Paid: $paid');
+            print('  Partial: $partial');
+            print('  Pending: $pending');
+          }
 
           // Validate required fields from backend
           if (responseData.containsKey('employees') &&
               responseData.containsKey('week_start_date') &&
               responseData.containsKey('week_end_date')) {
-            // Print employee details for debugging
-            if (responseData['employees'] is List) {
-              List employees = responseData['employees'];
-              for (int i = 0; i < employees.length && i < 3; i++) {
-                print(
-                    'Employee $i: ID=${employees[i]['employee_id']}, Name=${employees[i]['employee_name']}, Status=${employees[i]['payment_status']}');
-              }
-            }
+            print('✅ Response structure valid');
+            print('Wages Paid Flag: ${responseData['wages_paid']}');
+            print('Payment Type: ${responseData['payment_type']}');
 
-            // Return the data directly since backend doesn't wrap it
             return {
               'success': true,
               'statusCode': response.statusCode,
-              'data': responseData, // Direct response data from backend
+              'data': responseData,
             };
           } else {
             print('❌ Invalid response structure - missing required fields');
+            print('Available keys: ${responseData.keys}');
             return {
               'success': false,
               'statusCode': response.statusCode,
@@ -86,6 +112,7 @@ class AttendanceService {
         // Handle HTTP error responses
         try {
           final errorData = json.decode(response.body);
+          print('❌ API Error: ${errorData}');
           return {
             'success': false,
             'statusCode': response.statusCode,
@@ -132,6 +159,48 @@ class AttendanceService {
           'status': 'error',
           'message': 'An unexpected error occurred: ${e.toString()}'
         },
+      };
+    }
+  }
+
+  /// Verify payment data for debugging
+  static Future<Map<String, dynamic>> verifyPaymentData({
+    required DateTime weekStart,
+  }) async {
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(weekStart);
+      final uri = Uri.parse('$baseUrl/api/attendance/verify-payment-data/')
+          .replace(queryParameters: {'week_start': formattedDate});
+
+      print('🔍 Verifying payment data: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(Duration(seconds: timeoutDuration));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('✅ Verification successful');
+        print('Data: $data');
+        return {
+          'success': true,
+          'data': data,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Verification failed: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ Verification error: $e');
+      return {
+        'success': false,
+        'message': 'Error: $e',
       };
     }
   }

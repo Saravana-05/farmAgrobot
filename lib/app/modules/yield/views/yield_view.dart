@@ -183,58 +183,6 @@ class ViewYields extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Add Yield Button
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: controller.addNewYield,
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text(
-                    'Add New Yield',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 12),
-
-              // Refresh Button
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Obx(() => controller.isLoading.value
-                    ? Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: kPrimaryColor,
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        onPressed: controller.refreshYields,
-                        icon: Icon(Icons.refresh, color: kPrimaryColor),
-                      )),
-              ),
-            ],
-          ),
-
-          // Summary Information
-          SizedBox(height: 16),
           Obx(() => Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(

@@ -7,13 +7,15 @@ import '../../../data/services/connectivity_service.dart';
 
 class SplashController extends GetxController with GetTickerProviderStateMixin {
   final ConnectivityService connectivityService = Get.find<ConnectivityService>();
-  
+
+  late AnimationController _bgController;
   late AnimationController _leafController;
   late AnimationController _logoController;
   late AnimationController _secondImageController;
   late AnimationController _textController;
   late AnimationController _navButtonController;
 
+  late Animation<double> _bgAnimation;
   late Animation<double> _leafAnimation;
   late Animation<double> _logoOpacityAnimation;
   late Animation<double> _secondImageOpacityAnimation;
@@ -25,6 +27,7 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   final _showNavigationButton = false.obs;
 
   // Getters for animations
+  Animation<double> get bgAnimation => _bgAnimation;
   Animation<double> get leafAnimation => _leafAnimation;
   Animation<double> get logoOpacityAnimation => _logoOpacityAnimation;
   Animation<double> get secondImageOpacityAnimation => _secondImageOpacityAnimation;
@@ -43,7 +46,17 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void _initializeAnimations() {
-    // Longer duration for leaf animation
+    // Background animation controller
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat(reverse: true);
+
+    _bgAnimation = CurvedAnimation(
+      parent: _bgController,
+      curve: Curves.easeInOut,
+    );
+
     _leafController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -108,37 +121,38 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void _startAnimationSequence() async {
-    // Start leaf animation
+    // Start background animation first
+    _bgController.forward();
+
+    // Leaf animation
     await _leafController.forward();
-    
-    // Add delay before starting logo
+
+    // Delay before logo
     await Future.delayed(const Duration(milliseconds: 500));
     await _logoController.forward();
-    
-    // Add delay before second image
+
+    // Delay before second image
     await Future.delayed(const Duration(milliseconds: 300));
     await _secondImageController.forward();
-    
-    // Add delay before text
+
+    // Delay before text
     await Future.delayed(const Duration(milliseconds: 300));
     _textController.forward();
 
-    // Animate text typing effect with longer delay
+    // Typing effect for text
     for (int i = 0; i <= motto.length; i++) {
       _displayedText.value = motto.substring(0, i);
       await Future.delayed(const Duration(milliseconds: 80));
     }
 
-    // Show navigation button after text is complete
+    // Show navigation button
     await Future.delayed(const Duration(milliseconds: 500));
     _showNavigationButton.value = true;
     _navButtonController.forward();
   }
 
   void navigateToNext() {
-    // Check if user is logged in or navigate to login
     bool isLoggedIn = _checkUserLoginStatus();
-    
     if (isLoggedIn) {
       Get.offAllNamed(Routes.HOME);
     } else {
@@ -147,12 +161,13 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   }
 
   bool _checkUserLoginStatus() {
-    
-    return false; 
+    // TODO: Replace with real login check
+    return false;
   }
 
   @override
   void onClose() {
+    _bgController.dispose();
     _leafController.dispose();
     _logoController.dispose();
     _secondImageController.dispose();
