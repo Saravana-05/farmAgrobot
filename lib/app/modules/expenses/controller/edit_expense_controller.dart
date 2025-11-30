@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../../config/api.dart';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
+import '../../../global_widgets/custom_snackbar/snackbar.dart';
+import '../../../routes/app_pages.dart';
 
 class EditExpenseController extends GetxController {
   // Text Controllers
@@ -87,17 +89,10 @@ class EditExpenseController extends GetxController {
 
   // Helper method to show error and navigate back
   void _showErrorAndGoBack(String message) {
-    Get.snackbar(
-      'Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    CustomSnackbar.showError(title: 'Error', message: message);
     Get.back();
   }
 
-  // Load expense data using service
   // Load expense data using service
   Future<void> loadExpenseData() async {
     final id = expenseId.value;
@@ -110,15 +105,12 @@ class EditExpenseController extends GetxController {
       isLoading.value = true;
 
       final result = await _expenseService.getExpenseById(id);
-      print('Service result: $result'); // Debug log
 
       if (result['success'] == true) {
         final expenseData = result['data'];
-        print('Expense data to parse: $expenseData'); // Debug log
 
         if (expenseData != null) {
           final expense = ExpenseModel.fromJson(expenseData);
-          print('Created expense model: ${expense.toJson()}'); // Debug log
 
           currentExpense.value = expense;
           populateFormFields(expense);
@@ -143,7 +135,6 @@ class EditExpenseController extends GetxController {
     try {
       // Populate text controllers with null safety
       expNameController.text = expense.expenseName ?? '';
-      print('Set expense name: ${expNameController.text}');
       dateController.text = expense.expenseDate ?? '';
       descriptionController.text = expense.description ?? '';
       amountController.text = expense.amount?.toString() ?? '0';
@@ -173,13 +164,7 @@ class EditExpenseController extends GetxController {
       // Store original expense data for comparison
       originalExpense = expense;
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to populate form data: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     }
   }
 
@@ -197,10 +182,7 @@ class EditExpenseController extends GetxController {
       if (imageBytes != null) {
         image.value = imageBytes;
       }
-    } catch (e) {
-      print('Failed to load image: $e');
-      // Don't show snackbar for image loading failures as it's not critical
-    }
+    } catch (e) {}
   }
 
   // Date picker
@@ -238,13 +220,7 @@ class EditExpenseController extends GetxController {
         image.value = bytes;
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to select image: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      CustomSnackbar.showError(title: 'Error', message: e.toString());
     } finally {
       isUploading.value = false;
     }
@@ -299,13 +275,7 @@ class EditExpenseController extends GetxController {
 
   // Helper method for validation errors
   void _showValidationError(String message) {
-    Get.snackbar(
-      'Validation Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    CustomSnackbar.showError(title: 'Error', message: message);
   }
 
   // Update expense using service
@@ -348,37 +318,48 @@ class EditExpenseController extends GetxController {
         imageBytes: image.value,
       );
 
-      if (result['success'] == true) {
+      print('Service response: $result');
+
+      // Check for success with multiple possible formats
+      bool isSuccess = false;
+      if (result != null) {
+        if (result['success'] == true ||
+            result['success'] == 'true' ||
+            result['status'] == 'success' ||
+            result['status'] == true) {
+          isSuccess = true;
+        }
+      }
+
+      isSaving.value = false;
+
+      if (isSuccess) {
         // Update current expense with response data if available
         final responseData = result['data'];
         if (responseData != null) {
           currentExpense.value = ExpenseModel.fromJson(responseData);
         }
 
-        Get.snackbar(
-          'Success',
-          result['message'] ?? 'Expense updated successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
+        // ✅ Navigate back with success arguments - let the expenses page show the message
+        Get.offAllNamed(
+          Routes.EXPENSES,
+          arguments: {
+            'refresh': true,
+            'showSuccess': true,
+            'message': result['message'] ?? 'Expense updated successfully',
+          },
         );
-        Get.back(result: true); // Return true to indicate successful update
       } else {
-        Get.snackbar(
-          'Error',
-          result['message'] ?? 'Failed to update expense',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
+        // ✅ Only show error messages here
+        CustomSnackbar.showError(
+          title: 'Error',
+          message: result['message'] ?? 'Failed to update expense',
         );
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to update expense: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      CustomSnackbar.showError(
+        title: 'Error',
+        message: 'Failed to update expense: ${e.toString()}',
       );
     } finally {
       isSaving.value = false;

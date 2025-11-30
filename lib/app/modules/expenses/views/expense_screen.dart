@@ -11,7 +11,6 @@ class ExpensesScreen extends GetView<expense_controller.ExpensesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: MenuAppBar(
-        // isCustomScreen: false,
         title: 'Expenses',
         showAddIcon: true,
         onAddPressed: () {

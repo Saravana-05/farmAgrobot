@@ -51,12 +51,12 @@ class MyDrawer extends GetView<drawer_controller.DrawerController> {
             MyDrawerItem(
               title: 'Attendance',
               icon: Icons.co_present,
-              onTap: () => controller.navigateToPage('/attendance_new'),
+              onTap: () => controller.navigateToPage('/attendance'),
             ),
             MyDrawerItem(
               title: 'Farm Segments',
               icon: Icons.energy_savings_leaf,
-              onTap: () => controller.navigateToPage('/farms'),
+              onTap: () => controller.navigateToPage('/farm_segments'),
             ),
             MyDrawerItem(
               title: 'Merchants',
@@ -72,6 +72,11 @@ class MyDrawer extends GetView<drawer_controller.DrawerController> {
               title: 'Expenses',
               icon: Icons.attach_money,
               onTap: () => controller.navigateToPage('/expenses'),
+            ),
+            MyDrawerItem(
+              title: 'Wages',
+              icon: Icons.money,
+              onTap: () => controller.navigateToPage('/wages'),
             ),
             MyDrawerItem(
               title: 'Sales',

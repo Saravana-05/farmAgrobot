@@ -1,50 +1,57 @@
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import '../../core/values/app_colors.dart';
-import 'controller/bottom_navigation_controller.dart';
-
-
 
 class MyBottomNavigation extends StatelessWidget {
-  final NavigationController controller = Get.find<NavigationController>();
+  final int selectedIndex;
+  final ValueChanged<int> onTabSelected;
 
-  MyBottomNavigation({super.key, required int selectedIndex, required void Function(int index) onTabSelected});
+  const MyBottomNavigation({
+    super.key,
+    required this.selectedIndex,
+    required this.onTabSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final NavigationController controller = Get.put(NavigationController());
-    return Obx(() => CurvedNavigationBar(
-      index: controller.selectedIndex.value,
+    return CurvedNavigationBar(
+      index: selectedIndex,
       backgroundColor: kLightColor,
       color: kPrimaryColor,
-      onTap: (index) {
-        controller.changeTabIndex(index);
-      },
+      onTap: onTabSelected,
       items: [
         CurvedNavigationBarItem(
-          child: Icon(Icons.home,
-              color: controller.selectedIndex.value == 0 ? Colors.yellow : kLightColor),
+          child: Icon(
+            Icons.home,
+            color: selectedIndex == 0 ? Colors.yellow : kLightColor,
+          ),
           label: 'Home',
           labelStyle: TextStyle(
-              color: controller.selectedIndex.value == 0 ? Colors.yellow : kLightYellow),
+            color: selectedIndex == 0 ? Colors.yellow : kLightYellow,
+          ),
         ),
         CurvedNavigationBarItem(
-          child: Icon(Icons.dashboard,
-              color: controller.selectedIndex.value == 1 ? Colors.yellow : kLightColor),
+          child: Icon(
+            Icons.dashboard,
+            color: selectedIndex == 1 ? Colors.yellow : kLightColor,
+          ),
           label: 'Dashboard',
           labelStyle: TextStyle(
-              color: controller.selectedIndex.value == 1 ? Colors.yellow : kLightYellow),
+            color: selectedIndex == 1 ? Colors.yellow : kLightYellow,
+          ),
         ),
         CurvedNavigationBarItem(
-          child: Icon(Icons.settings,
-              color: controller.selectedIndex.value == 2 ? Colors.yellow : kLightColor),
+          child: Icon(
+            Icons.settings,
+            color: selectedIndex == 2 ? Colors.yellow : kLightColor,
+          ),
           label: 'Settings',
           labelStyle: TextStyle(
-              color: controller.selectedIndex.value == 2 ? Colors.yellow : kLightYellow),
+            color: selectedIndex == 2 ? Colors.yellow : kLightYellow,
+          ),
         ),
       ],
-    ));
+    );
   }
 }

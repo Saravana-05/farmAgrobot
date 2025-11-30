@@ -3,7 +3,7 @@ import '../../../config/api.dart';
 class ExpenseModel {
   final int? id;
   final String expenseName;
-  final String expenseDate;
+  final dynamic expenseDate;
   final String expenseCategory;
   final String description;
   final double amount;
@@ -59,7 +59,7 @@ class ExpenseModel {
     return ExpenseModel(
       id: json['id'],
       expenseName: json['expense_name'] ?? '',
-      expenseDate: json['date'] ?? '',
+      expenseDate: json['date'] ,
       expenseCategory: json['category'] ?? '',
       description: json['description'] ?? '',
       amount: double.tryParse(json['amount'].toString()) ?? 0.0,

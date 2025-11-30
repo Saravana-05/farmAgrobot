@@ -16,8 +16,6 @@ class ExpenseService extends GetxService {
     bool useDefaultImage = false,
   }) async {
     try {
-    
-
       var uri = Uri.parse(addExpense);
       var request = http.MultipartRequest('POST', uri);
 
@@ -39,8 +37,6 @@ class ExpenseService extends GetxService {
         'mode_of_payment': expense.modeOfPayment,
       });
 
-      print('Form fields added: ${request.fields}');
-
       // Handle image upload with priority: imageFile > imageBytes > defaultImage
       bool imageAdded = false;
 
@@ -48,7 +44,6 @@ class ExpenseService extends GetxService {
         try {
           // Verify file size
           final fileSize = await imageFile.length();
-          print('Image file size: $fileSize bytes');
 
           if (fileSize > 0) {
             // Get file extension
@@ -76,21 +71,15 @@ class ExpenseService extends GetxService {
 
             request.files.add(multipartFile);
             imageAdded = true;
-            print(
-                'Image file added successfully: $fileName (${fileSize} bytes)');
-          } else {
-            print('Warning: Image file is empty');
           }
         } catch (e) {
-          print('Error adding image file: $e');
+          // Silent error handling for production
         }
       }
 
       // If imageFile failed or is null, try imageBytes
       if (!imageAdded && imageBytes != null && imageBytes.isNotEmpty) {
         try {
-          print('Using image bytes, length: ${imageBytes.length}');
-
           var multipartFile = http.MultipartFile.fromBytes(
             'file',
             imageBytes,
@@ -99,9 +88,8 @@ class ExpenseService extends GetxService {
 
           request.files.add(multipartFile);
           imageAdded = true;
-          print('Image bytes added successfully: ${imageBytes.length} bytes');
         } catch (e) {
-          print('Error adding image bytes: $e');
+          // Silent error handling for production
         }
       }
 
@@ -109,24 +97,10 @@ class ExpenseService extends GetxService {
       if (!imageAdded) {
         if (useDefaultImage) {
           request.fields['default_exp_image'] = 'true';
-          print('Using default image');
-        } else {
-          print('No image will be sent');
-        }
-      }
-
-      print('Final request fields: ${request.fields}');
-      print('Final request files: ${request.files.length} files');
-
-      if (request.files.isNotEmpty) {
-        for (var file in request.files) {
-          print(
-              'File: ${file.field}, filename: ${file.filename}, length: ${file.length}');
         }
       }
 
       // Send the request with timeout
-      print('Sending request...');
       var response = await request.send().timeout(
         Duration(seconds: 60), // Increased timeout for image uploads
         onTimeout: () {
@@ -134,23 +108,17 @@ class ExpenseService extends GetxService {
         },
       );
 
-      print('Response status code: ${response.statusCode}');
-      print('Response headers: ${response.headers}');
-
       var responseBody = await response.stream.bytesToString();
-      print('Response body: $responseBody');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         try {
           var jsonResponse = json.decode(responseBody);
-          print('Success response: $jsonResponse');
           return {
             'success': true,
             'message': jsonResponse['message'] ?? 'Expense saved successfully',
             'data': jsonResponse['data'],
           };
         } catch (e) {
-          print('Error parsing success response: $e');
           return {
             'success': true,
             'message': 'Expense saved successfully',
@@ -158,8 +126,6 @@ class ExpenseService extends GetxService {
           };
         }
       } else {
-        print('Server error response: ${response.statusCode} - $responseBody');
-
         try {
           var errorResponse = json.decode(responseBody);
           return {
@@ -169,7 +135,6 @@ class ExpenseService extends GetxService {
             'status_code': response.statusCode,
           };
         } catch (e) {
-          print('Error parsing error response: $e');
           return {
             'success': false,
             'message': 'Server error: ${response.statusCode}',
@@ -178,7 +143,6 @@ class ExpenseService extends GetxService {
         }
       }
     } on SocketException catch (e) {
-      print('SocketException: ${e.toString()}');
       return {
         'success': false,
         'message':
@@ -186,22 +150,18 @@ class ExpenseService extends GetxService {
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
-      print('TimeoutException: ${e.toString()}');
       return {
         'success': false,
         'message': 'Request timed out. Please try again.',
         'error_type': 'timeout_error',
       };
     } on HttpException catch (e) {
-      print('HttpException: ${e.toString()}');
       return {
         'success': false,
         'message': 'HTTP error occurred: ${e.message}',
         'error_type': 'http_error',
       };
     } catch (e) {
-      print('General Exception: ${e.toString()}');
-      print('Stack trace: ${StackTrace.current}');
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -212,8 +172,6 @@ class ExpenseService extends GetxService {
 
   Future<Map<String, dynamic>> getExpenses() async {
     try {
-      print('Attempting to fetch from: $baseUrl'); // Debug log
-
       var response = await http.get(
         Uri.parse(baseUrl),
         headers: {'Content-Type': 'application/json'},
@@ -231,8 +189,6 @@ class ExpenseService extends GetxService {
           'data': jsonResponse,
         };
       } else {
-        print(
-            'Server response: ${response.statusCode} - ${response.body}'); // Debug log
         return {
           'success': false,
           'message':
@@ -240,7 +196,6 @@ class ExpenseService extends GetxService {
         };
       }
     } on SocketException catch (e) {
-      print('SocketException: ${e.toString()}'); // Debug log
       return {
         'success': false,
         'message':
@@ -248,21 +203,18 @@ class ExpenseService extends GetxService {
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
-      print('TimeoutException: ${e.toString()}'); // Debug log
       return {
         'success': false,
         'message': 'Request timed out. Please try again.',
         'error_type': 'timeout_error',
       };
     } on HttpException catch (e) {
-      print('HttpException: ${e.toString()}'); // Debug log
       return {
         'success': false,
         'message': 'HTTP error occurred: ${e.message}',
         'error_type': 'http_error',
       };
     } catch (e) {
-      print('General Exception: ${e.toString()}'); // Debug log
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -348,7 +300,6 @@ class ExpenseService extends GetxService {
 
     try {
       final String url = editExpenseUrl.replaceAll('{id}', id);
-      print('Attempting to fetch expense from: $url'); // Debug log
 
       final response = await http.get(
         Uri.parse(url),
@@ -362,14 +313,12 @@ class ExpenseService extends GetxService {
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
-        print('Raw API response: $jsonResponse'); // Debug log
 
         // Check if response has the expected structure
         if (jsonResponse['status'] == 'success' &&
             jsonResponse['data'] != null) {
           // Extract the actual expense data from the nested structure
           final expenseData = jsonResponse['data'] as Map<String, dynamic>;
-          print('Extracted expense data: $expenseData'); // Debug log
 
           return {
             'success': true,
@@ -384,8 +333,6 @@ class ExpenseService extends GetxService {
           };
         }
       } else {
-        print('Server response: ${response.statusCode} - ${response.body}');
-
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
@@ -402,7 +349,6 @@ class ExpenseService extends GetxService {
         };
       }
     } on SocketException catch (e) {
-      print('SocketException: ${e.toString()}');
       return {
         'success': false,
         'message':
@@ -410,21 +356,18 @@ class ExpenseService extends GetxService {
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
-      print('TimeoutException: ${e.toString()}');
       return {
         'success': false,
         'message': 'Request timed out. Please try again.',
         'error_type': 'timeout_error',
       };
     } on HttpException catch (e) {
-      print('HttpException: ${e.toString()}');
       return {
         'success': false,
         'message': 'HTTP error occurred: ${e.message}',
         'error_type': 'http_error',
       };
     } catch (e) {
-      print('General Exception: ${e.toString()}');
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -449,7 +392,6 @@ class ExpenseService extends GetxService {
 
     try {
       final String url = updateExpenseUrl.replaceAll('{id}', id);
-      print('Attempting to update expense at: $url'); // Debug log
 
       var uri = Uri.parse(url);
       var request = http.MultipartRequest('PUT', uri);
@@ -485,8 +427,6 @@ class ExpenseService extends GetxService {
       );
 
       var responseBody = await response.stream.bytesToString();
-      print(
-          'Update response: ${response.statusCode} - $responseBody'); // Debug log
 
       if (response.statusCode == 200) {
         var jsonResponse = json.decode(responseBody);
@@ -511,7 +451,6 @@ class ExpenseService extends GetxService {
         };
       }
     } on SocketException catch (e) {
-      print('SocketException: ${e.toString()}');
       return {
         'success': false,
         'message':
@@ -519,21 +458,18 @@ class ExpenseService extends GetxService {
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
-      print('TimeoutException: ${e.toString()}');
       return {
         'success': false,
         'message': 'Request timed out. Please try again.',
         'error_type': 'timeout_error',
       };
     } on HttpException catch (e) {
-      print('HttpException: ${e.toString()}');
       return {
         'success': false,
         'message': 'HTTP error occurred: ${e.message}',
         'error_type': 'http_error',
       };
     } catch (e) {
-      print('General Exception: ${e.toString()}');
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -557,11 +493,9 @@ class ExpenseService extends GetxService {
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {
-        print('Failed to load image: Status ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error loading image from URL: $e');
       return null;
     }
   }
@@ -582,12 +516,9 @@ class ExpenseService extends GetxService {
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
       } else {
-        print('Delete failed with status: ${response.statusCode}');
-        print('Response body: ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error deleting expense: $e');
       throw Exception('Failed to delete expense: $e');
     }
   }

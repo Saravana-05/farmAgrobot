@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'dart:typed_data';
+import '../../../core/values/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/expense/expense_model.dart';
 import '../../../data/services/expenses/expense_service.dart';
+import '../../../global_widgets/custom_snackbar/flash_message.dart';
 import '../../../routes/app_pages.dart';
-import '../views/expense_screen.dart';
 
 class AddExpensesController extends GetxController {
   // Observable variables
@@ -32,7 +33,7 @@ class AddExpensesController extends GetxController {
   final ImagePicker _picker = ImagePicker();
   File? _imageFile;
 
-  // Static data (replacing Firebase data)
+  // Static data
   final List<String> modeOfPayment = ['Cash', 'Card', 'UPI', 'Bank', 'Cheque'];
   final List<String> categoryTypes = [
     'Advance',
@@ -53,7 +54,6 @@ class AddExpensesController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Set current date as default
     dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
   }
 
@@ -67,44 +67,43 @@ class AddExpensesController extends GetxController {
     super.onClose();
   }
 
-  Future<void> selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: Get.context!,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) {
-      dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-    }
-  }
-
+  /// ✅ Fixed: Always use overlay context for dialogs
   void selectImage() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Choose an option'),
-        content: SingleChildScrollView(
-          child: ListBody(
-            children: <Widget>[
-              GestureDetector(
-                child: const Text('Camera'),
-                onTap: () {
-                  Get.back();
-                  pickImage(ImageSource.camera);
-                },
-              ),
-              const Padding(padding: EdgeInsets.all(8.0)),
-              GestureDetector(
-                child: const Text('Gallery'),
-                onTap: () {
-                  Get.back();
-                  pickImage(ImageSource.gallery);
-                },
-              ),
-            ],
+    final ctx = Get.overlayContext;
+    if (ctx == null) {
+      // Delay until overlay is ready
+      WidgetsBinding.instance.addPostFrameCallback((_) => selectImage());
+      return;
+    }
+
+    showDialog(
+      context: ctx,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose an option'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                GestureDetector(
+                  child: const Text('Camera'),
+                  onTap: () {
+                    Get.back();
+                    pickImage(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  child: const Text('Gallery'),
+                  onTap: () {
+                    Get.back();
+                    pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -120,34 +119,25 @@ class AddExpensesController extends GetxController {
       );
 
       if (pickedFile == null) {
-        Get.snackbar(
-          'Info',
-          'No image selected',
-          snackPosition: SnackPosition.BOTTOM,
+        CustomFlashMessage.showInfo(
+          title: 'Info',
+          message: 'No image selected',
         );
         return;
       }
 
       _imageFile = File(pickedFile.path);
       final imageBytes = await pickedFile.readAsBytes();
-
-      // Set the image directly
       image.value = imageBytes;
 
-      Get.snackbar(
-        'Success',
-        'Image selected successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
+      CustomFlashMessage.showInfo(
+        title: 'Info',
+        message: 'Image selected successfully',
       );
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to process image. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: e.toString(),
       );
     } finally {
       isUploading.value = false;
@@ -156,80 +146,68 @@ class AddExpensesController extends GetxController {
 
   bool _validateForm() {
     if (expNameController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter expense name',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Expense name cannot be empty',
+      );
+      return false;
+    }
+
+    if (expNameController.text.trim().length < 2) {
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Expense name must be at least 2 characters',
       );
       return false;
     }
 
     if (dateController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select expense date',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Please select expense date',
       );
       return false;
     }
 
     if (selectedCategoryTypes.value == null ||
         selectedCategoryTypes.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select expense category',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Please select expense category',
       );
       return false;
     }
 
     if (amountController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter amount',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Please enter amount',
       );
       return false;
     }
 
-    if (double.tryParse(amountController.text.trim()) == null) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter valid amount',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+    double? amount = double.tryParse(amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Please enter a valid amount greater than 0',
       );
       return false;
     }
 
-    if (spentByController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please enter spent by',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+    if (amount > 999999999.99) {
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Amount is too large',
       );
       return false;
     }
 
     if (selectedModeOfPayment.value == null ||
         selectedModeOfPayment.value!.isEmpty) {
-      Get.snackbar(
-        'Validation Error',
-        'Please select mode of payment',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'Please select mode of payment',
       );
       return false;
     }
@@ -237,16 +215,92 @@ class AddExpensesController extends GetxController {
     return true;
   }
 
-  void saveExpense() async {
-    if (isSaving.value) return;
+  /// ✅ Safe snackbar usage with overlay context
+  bool validateDate(String dateText) {
+    if (dateText.isEmpty) return false;
 
+    try {
+      DateTime selectedDate = DateTime.parse(
+          DateFormat('dd-MM-yyyy').parse(dateText).toIso8601String());
+      DateTime currentDate = DateTime.now();
+
+      selectedDate =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      currentDate =
+          DateTime(currentDate.year, currentDate.month, currentDate.day);
+
+      if (selectedDate.isAfter(currentDate)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.snackbar(
+            'Invalid Date',
+            'Future dates are not allowed for expenses',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orange.withOpacity(0.1),
+            colorText: Colors.orange,
+            icon: const Icon(Icons.calendar_today, color: Colors.orange),
+            duration: const Duration(seconds: 3),
+            margin: const EdgeInsets.all(10),
+            borderRadius: 8,
+          );
+        });
+        return false;
+      }
+
+      return true;
+    } catch (_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.snackbar(
+          'Invalid Date Format',
+          'Please select a valid date',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+          icon: const Icon(Icons.error_outline, color: Colors.red),
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(10),
+          borderRadius: 8,
+        );
+      });
+      return false;
+    }
+  }
+
+  Future<void> selectDate() async {
+    final ctx = Get.overlayContext!;
+    DateTime? selectedDate = await showDatePicker(
+      context: ctx,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: kPrimaryColor,
+              onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate != null) {
+      String formattedDate =
+          "${selectedDate.day.toString().padLeft(2, '0')}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.year}";
+      dateController.text = formattedDate;
+    }
+  }
+
+  Future<void> saveExpense() async {
+    if (isSaving.value) return;
     if (!_validateForm()) return;
+    if (!validateDate(dateController.text)) return;
 
     try {
       isSaving.value = true;
 
-      // Create expense model
-      ExpenseModel expense = ExpenseModel(
+      final expense = ExpenseModel(
         expenseName: expNameController.text.trim(),
         expenseDate: dateController.text.trim(),
         expenseCategory: selectedCategoryTypes.value!,
@@ -256,47 +310,47 @@ class AddExpensesController extends GetxController {
         modeOfPayment: selectedModeOfPayment.value!,
       );
 
-      // Save expense to API
-      Map<String, dynamic> result = await _expenseService.saveExpense(
+      final result = await _expenseService.saveExpense(
         expense: expense,
         imageFile: _imageFile,
         imageBytes: image.value,
         useDefaultImage: _imageFile == null && image.value == null,
       );
 
+      isSaving.value = false;
+
       if (result['success']) {
-        Get.snackbar(
-          'Success',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-
-        // Clear form
         _clearForm();
-
-        // Navigate to expenses screen
-        Get.to(() => ExpensesScreen());
-      } else {
-        Get.snackbar(
-          'Error',
-          result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
+        Get.offAllNamed(
+          Routes.EXPENSES,
+          arguments: {
+            'refresh': true,
+            'showSuccess': true,
+            'message': result['message'] ?? 'Expense added successfully',
+          },
         );
+      } else {
+        String errorMessage = result['message'] ?? 'Failed to save expense';
+        if (result['errors'] != null) {
+          final errors = result['errors'] as Map<String, dynamic>;
+          if (errors.containsKey('spent_by')) {
+            errorMessage = errors['spent_by'][0];
+          } else if (errors.containsKey('expense_name')) {
+            errorMessage = errors['expense_name'][0];
+          } else if (errors.containsKey('amount')) {
+            errorMessage = errors['amount'][0];
+          } else if (errors.containsKey('expense_date')) {
+            errorMessage = errors['expense_date'][0];
+          }
+        }
+        CustomFlashMessage.showError(title: 'Error', message: errorMessage);
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to save expense: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
       isSaving.value = false;
+      CustomFlashMessage.showError(
+        title: 'Error',
+        message: 'An error occurred: ${e.toString()}',
+      );
     }
   }
 
@@ -312,9 +366,7 @@ class AddExpensesController extends GetxController {
     _imageFile = null;
   }
 
-  void navigateToViewExpenses() {
-    Get.toNamed(Routes.EXPENSES);
-  }
+  void navigateToViewExpenses() => Get.toNamed(Routes.EXPENSES);
 
   void navigateToTab(int index) {
     selectedIndex.value = index;
