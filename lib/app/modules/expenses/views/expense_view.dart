@@ -562,7 +562,7 @@ class ViewExpenses extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.chevron_left, size: 18),
+                Icon(Icons.chevron_left,color: kLightColor, size: 18),
                 SizedBox(width: 2),
                 Text('Previous',
                     style:
@@ -613,7 +613,7 @@ class ViewExpenses extends StatelessWidget {
                     style:
                         TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 SizedBox(width: 2),
-                Icon(Icons.chevron_right, size: 18),
+                Icon(Icons.chevron_right,color: kLightColor, size: 18),
               ],
             ),
           ),

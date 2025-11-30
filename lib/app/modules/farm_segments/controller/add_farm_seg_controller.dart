@@ -1,7 +1,7 @@
-import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/farm_segment/farm_seg_service.dart';
+import '../../../global_widgets/custom_snackbar/snackbar.dart';
 import '../../../routes/app_pages.dart';
 
 class AddFarmSegmentController extends GetxController {

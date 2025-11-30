@@ -141,40 +141,31 @@ class WeeklyData {
   });
 
   factory WeeklyData.fromJson(Map<String, dynamic> json) {
-    print('=== WeeklyData.fromJson DEBUG ===');
+    print('=== WeeklyData.fromJson START ===');
     print('Input JSON keys: ${json.keys}');
-    print('Input JSON employees: ${json['employees']}');
 
+    // Parse employees
     List<AttendanceData> employees = [];
-    if (json['employees'] != null) {
-      print('Employees is not null, type: ${json['employees'].runtimeType}');
-      if (json['employees'] is List) {
-        List employeesList = json['employees'] as List;
-        print('Employees list length: ${employeesList.length}');
+    if (json['employees'] != null && json['employees'] is List) {
+      List employeesList = json['employees'] as List;
+      print('Processing ${employeesList.length} employees...');
 
-        for (int i = 0; i < employeesList.length; i++) {
-          print('Processing employee $i: ${employeesList[i]}');
-          try {
-            final attendanceData = AttendanceData.fromJson(employeesList[i]);
-            employees.add(attendanceData);
-            print(
-                '✅ Successfully parsed employee $i: ${attendanceData.employeeName}');
-          } catch (e) {
-            print('❌ Error parsing employee $i: $e');
-          }
+      for (int i = 0; i < employeesList.length; i++) {
+        try {
+          final attendanceData = AttendanceData.fromJson(employeesList[i]);
+          employees.add(attendanceData);
+        } catch (e, stackTrace) {
+          print('❌ Error parsing employee $i: $e');
+          print('Stack trace: $stackTrace');
         }
-      } else {
-        print(
-            '❌ Employees is not a List, type: ${json['employees'].runtimeType}');
       }
-    } else {
-      print('❌ Employees is null');
     }
 
-    print('Final parsed employees count: ${employees.length}');
+    print('✅ Successfully parsed ${employees.length} employees');
 
+    // Parse daily counts
     Map<String, int> dailyCounts = {};
-    if (json['daily_counts'] != null) {
+    if (json['daily_counts'] != null && json['daily_counts'] is Map) {
       Map<String, dynamic> counts = json['daily_counts'];
       counts.forEach((date, count) {
         dailyCounts[date] =
@@ -183,46 +174,110 @@ class WeeklyData {
     }
 
     final result = WeeklyData(
-      weekStartDate: json['week_start_date'] ?? '',
-      weekEndDate: json['week_end_date'] ?? '',
+      weekStartDate: json['week_start_date']?.toString() ?? '',
+      weekEndDate: json['week_end_date']?.toString() ?? '',
       employees: employees,
       dailyCounts: dailyCounts,
-      totalWages: (json['total_wages'] ?? 0).toDouble(),
+      totalWages: _parseDoubleFromJson(json['total_wages']) ?? 0.0,
       wagesPaid: json['wages_paid'] ?? false,
       weeklyEmployeeCount: json['weekly_employee_count'] ?? 0,
     );
 
-    print('WeeklyData created with ${result.employees.length} employees');
+    print('=== WeeklyData.fromJson COMPLETE ===');
+    print('Total employees: ${result.employees.length}');
+    print('Total wages: ₹${result.totalWages}');
+    print('Wages paid: ${result.wagesPaid}');
+    print('Weekly employee count: ${result.weeklyEmployeeCount}');
+
+    // Print payment summary from employees
+    int paidCount = 0;
+    int partialCount = 0;
+    int pendingCount = 0;
+    double totalPaid = 0;
+    double totalRemaining = 0;
+
+    for (var emp in result.employees) {
+      switch (emp.paymentStatus) {
+        case 'paid':
+          paidCount++;
+          break;
+        case 'partial':
+          partialCount++;
+          break;
+        default:
+          pendingCount++;
+      }
+      totalPaid += emp.partialPayment;
+      totalRemaining += emp.remainingAmount;
+    }
+
+    print('\n📊 Payment Summary:');
+    print('  Fully Paid: $paidCount');
+    print('  Partially Paid: $partialCount');
+    print('  Pending: $pendingCount');
+    print('  Total Paid: ₹$totalPaid');
+    print('  Total Remaining: ₹$totalRemaining');
+
     return result;
+  }
+
+  /// Helper method to safely parse double values
+  static double? _parseDoubleFromJson(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'week_start_date': weekStartDate,
+      'week_end_date': weekEndDate,
+      'employees': employees
+          .map((e) => {
+                'employee_id': e.employeeId,
+                'employee_name': e.employeeName,
+                
+                'daily_wage': e.dailyWage,
+                'attendance': e.attendance,
+                'present_days': e.presentDays,
+                'half_days': e.halfDays,
+                'total_wages': e.totalWages,
+                'payment_status': e.paymentStatus,
+                'partial_payment': e.partialPayment,
+                'remaining_amount': e.remainingAmount,
+              })
+          .toList(),
+      'daily_counts': dailyCounts,
+      'total_wages': totalWages,
+      'wages_paid': wagesPaid,
+      'weekly_employee_count': weeklyEmployeeCount,
+    };
   }
 }
 
 class AttendanceRecord {
   final String date;
-  final int totalEntries;
+  final int totalEmployees;
   final AttendanceSummary summary;
   final List<EmployeeAttendance> attendanceData;
 
   AttendanceRecord({
     required this.date,
-    required this.totalEntries,
+    required this.totalEmployees,
     required this.summary,
     required this.attendanceData,
   });
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
-    List<EmployeeAttendance> attendanceData = [];
-    if (json['attendance_data'] != null) {
-      attendanceData = (json['attendance_data'] as List)
-          .map((e) => EmployeeAttendance.fromJson(e))
-          .toList();
-    }
-
     return AttendanceRecord(
       date: json['date'] ?? '',
-      totalEntries: json['total_employees'] ?? 0,
-      summary: AttendanceSummary.fromJson(json),
-      attendanceData: attendanceData,
+      totalEmployees: json['total_employees'] ?? 0,
+      summary: AttendanceSummary.fromJson(json['attendance_summary'] ?? {}),
+      attendanceData: (json['attendance_data'] as List<dynamic>? ?? [])
+          .map((e) => EmployeeAttendance.fromJson(e))
+          .toList(),
     );
   }
 }
@@ -249,6 +304,7 @@ class EmployeeAttendance {
     );
   }
 
+  /// 🔥 Add this method
   Map<String, dynamic> toJson() {
     return {
       'employee_id': employeeId,
@@ -273,12 +329,11 @@ class AttendanceSummary {
   });
 
   factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
-    var summary = json['attendance_summary'] ?? {};
     return AttendanceSummary(
-      present: summary['present'] ?? 0,
-      absent: summary['absent'] ?? 0,
-      halfDay: summary['half_day'] ?? 0,
-      totalWages: (summary['total_wages'] ?? 0).toDouble(),
+      present: json['present'] ?? 0,
+      absent: json['absent'] ?? 0,
+      halfDay: json['half_day'] ?? 0,
+      totalWages: (json['total_wages'] ?? 0).toDouble(),
     );
   }
 }

@@ -1055,8 +1055,8 @@ class AttendanceUIController extends GetxController {
 
   void _recalculateWageSummary() {
     double totalPaid = 0.0;
-    bool allPaid = true;
-    bool hasEmployeesWithWages = false;
+    int employeesWithWages = 0;
+    int employeesFullyPaid = 0;
 
     for (var employee in employees) {
       final totalWages = getTotalWages(employee.id);
@@ -1065,15 +1065,25 @@ class AttendanceUIController extends GetxController {
 
       totalPaid += paidAmount;
 
+      // Only count employees who have wages to be paid
       if (totalWages > 0) {
-        hasEmployeesWithWages = true;
-        if (remainingAmount > 0) {
-          allPaid = false;
+        employeesWithWages++;
+
+        // Check if this employee is fully paid (remaining is 0 or negligible)
+        if (remainingAmount <= 0.01) {
+          employeesFullyPaid++;
         }
       }
     }
 
-    wagesPaid.value = hasEmployeesWithWages && allPaid;
+    wagesPaid.value =
+        (employeesWithWages > 0) && (employeesFullyPaid == employeesWithWages);
+
+    print(
+        ' Wage Summary: Employees with wages: $employeesWithWages, Fully paid: $employeesFullyPaid, All paid: ${wagesPaid.value}');
+
+    // Force UI refresh
+    wagesPaid.refresh();
   }
 
   Future<void> payAllWages(
@@ -1168,7 +1178,7 @@ class AttendanceUIController extends GetxController {
 
   Future<void> _handleSuccessfulBulkPayment(
       Map<String, dynamic>? responseData) async {
-    print('💰 Bulk payment successful, refreshing data...');
+    print(' Payment successful, refreshing data...');
 
     // CRITICAL: Fetch fresh data
     await fetchWeeklyData();
@@ -1193,7 +1203,7 @@ class AttendanceUIController extends GetxController {
           children: [
             Icon(Icons.check_circle, color: Colors.green.shade600, size: 28),
             const SizedBox(width: 8),
-            const Text('Bulk Payment Successful'),
+            const Text('Payment Successful'),
           ],
         ),
         content: Column(

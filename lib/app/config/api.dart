@@ -2,7 +2,7 @@
 // const String baseImgUrl = 'http://192.168.0.111:8000';
 
 const String baseUrl = 'https://farmagrobot.ofal.in/api/';
-const String baseImgUrl = 'https://farmagrobot.ofal.in';
+const String baseImgUrl = 'https://farmagrobot.ofal.in/xeApp';
 
 // Expenses
 const String addExpense = baseUrl + 'expenses/';
@@ -18,6 +18,9 @@ const String deleteEmployeeUrl = baseUrl + 'employees/{id}/delete';
 const String updateEmployeeUrl = baseUrl + 'employees/{id}/edit';
 const String editEmployeeUrl = baseUrl + 'employees/{id}/';
 const String statusEmployeeUrl = baseUrl + 'employees/{id}/status';
+// Employee Weekly Status
+const String updateEmployeeWeeklyStatusUrl =
+    baseUrl + 'employees/weekly-status/update';
 
 /// Enhanced image URL handling with validation
 String getFullImageUrl(String? relativePath) {

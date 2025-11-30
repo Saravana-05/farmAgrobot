@@ -24,6 +24,10 @@ class YieldViewController extends GetxController {
   var hasNext = false.obs;
   var hasPrevious = false.obs;
 
+  // ✅ NEW: Better state management for "show all"
+  var showAllRecords = false.obs;
+  var isLoadingAllRecords = false.obs;
+
   // Filters
   var selectedCropId = Rxn<String>();
   var selectedFarmSegmentId = Rxn<String>();
@@ -63,31 +67,31 @@ class YieldViewController extends GetxController {
 
   // Enhanced image URL processing for multiple images
   String processImageUrl(String? imageUrl) {
-  if (imageUrl == null || imageUrl.isEmpty) {
-    print('processImageUrl: Empty or null URL');
-    return '';
+    if (imageUrl == null || imageUrl.isEmpty) {
+      print('processImageUrl: Empty or null URL');
+      return '';
+    }
+
+    String cleanUrl = imageUrl.trim();
+    print('processImageUrl: Processing URL: "$cleanUrl"');
+
+    // If it's already a complete URL, return it
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      print('processImageUrl: Complete URL found: $cleanUrl');
+      return cleanUrl;
+    }
+
+    // If it starts with /, remove it to avoid double slashes
+    if (cleanUrl.startsWith('/')) {
+      cleanUrl = cleanUrl.substring(1);
+    }
+
+    // Construct full URL
+    String fullUrl = '$baseImgUrl/$cleanUrl';
+
+    print('processImageUrl: Constructed URL: $fullUrl from: $imageUrl');
+    return fullUrl;
   }
-
-  String cleanUrl = imageUrl.trim();
-  print('processImageUrl: Processing URL: "$cleanUrl"');
-
-  // If it's already a complete URL, return it
-  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
-    print('processImageUrl: Complete URL found: $cleanUrl');
-    return cleanUrl;
-  }
-
-  // If it starts with /, remove it to avoid double slashes
-  if (cleanUrl.startsWith('/')) {
-    cleanUrl = cleanUrl.substring(1);
-  }
-
-  // Construct full URL
-  String fullUrl = '$baseImgUrl/$cleanUrl';
-
-  print('processImageUrl: Constructed URL: $fullUrl from: $imageUrl');
-  return fullUrl;
-}
 
   // Process multiple image URLs (for arrays of images)
   List<String> processMultipleImageUrls(dynamic imageUrls) {
@@ -165,88 +169,93 @@ class YieldViewController extends GetxController {
   }
 
   // Extract bill URLs from yield data (handles multiple formats)
- List<String> extractBillUrls(Map<String, dynamic> yieldData) {
-  List<String> billUrls = [];
+  List<String> extractBillUrls(Map<String, dynamic> yieldData) {
+    List<String> billUrls = [];
 
-  print('Extracting bill URLs from data: $yieldData');
+    print('Extracting bill URLs from data: $yieldData');
 
-  // Check different possible field names for bill URLs
-  List<String> possibleFields = [
-    'bill_urls',
-    'billUrls', 
-    'bill_url',
-    'billUrl',
-    'images',
-    'bill_images',
-    'billImages',
-    'attachments',
-    'files',
-    'bill_image_urls'
-  ];
+    // Check different possible field names for bill URLs
+    List<String> possibleFields = [
+      'bill_urls',
+      'billUrls',
+      'bill_url',
+      'billUrl',
+      'images',
+      'bill_images',
+      'billImages',
+      'attachments',
+      'files',
+      'bill_image_urls'
+    ];
 
-  for (String field in possibleFields) {
-    if (yieldData.containsKey(field) && yieldData[field] != null) {
-      dynamic fieldValue = yieldData[field];
-      print('Found field "$field" with value: $fieldValue');
-      
-      if (fieldValue is List) {
-        // Handle array of URLs or objects
-        for (var item in fieldValue) {
-          if (item is String && item.isNotEmpty) {
-            String processedUrl = processImageUrl(item);
-            if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
-              billUrls.add(processedUrl);
+    for (String field in possibleFields) {
+      if (yieldData.containsKey(field) && yieldData[field] != null) {
+        dynamic fieldValue = yieldData[field];
+        print('Found field "$field" with value: $fieldValue');
+
+        if (fieldValue is List) {
+          // Handle array of URLs or objects
+          for (var item in fieldValue) {
+            if (item is String && item.isNotEmpty) {
+              String processedUrl = processImageUrl(item);
+              if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
+                billUrls.add(processedUrl);
+              }
+            } else if (item is Map && item.containsKey('image')) {
+              // Handle bill image objects
+              String? imageUrl = item['image'];
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                String processedUrl = processImageUrl(imageUrl);
+                if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
+                  billUrls.add(processedUrl);
+                }
+              }
             }
-          } else if (item is Map && item.containsKey('image')) {
-            // Handle bill image objects
-            String? imageUrl = item['image'];
-            if (imageUrl != null && imageUrl.isNotEmpty) {
-              String processedUrl = processImageUrl(imageUrl);
+          }
+        } else if (fieldValue is String && fieldValue.isNotEmpty) {
+          // Handle single URL or comma-separated URLs
+          if (fieldValue.contains(',')) {
+            List<String> splitUrls = fieldValue
+                .split(',')
+                .map((url) => url.trim())
+                .where((url) => url.isNotEmpty)
+                .toList();
+
+            for (String url in splitUrls) {
+              String processedUrl = processImageUrl(url);
               if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
                 billUrls.add(processedUrl);
               }
             }
-          }
-        }
-      } else if (fieldValue is String && fieldValue.isNotEmpty) {
-        // Handle single URL or comma-separated URLs
-        if (fieldValue.contains(',')) {
-          List<String> splitUrls = fieldValue.split(',')
-              .map((url) => url.trim())
-              .where((url) => url.isNotEmpty)
-              .toList();
-          
-          for (String url in splitUrls) {
-            String processedUrl = processImageUrl(url);
+          } else {
+            String processedUrl = processImageUrl(fieldValue);
             if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
               billUrls.add(processedUrl);
             }
           }
-        } else {
-          String processedUrl = processImageUrl(fieldValue);
-          if (processedUrl.isNotEmpty && isValidImageUrl(processedUrl)) {
-            billUrls.add(processedUrl);
-          }
         }
       }
     }
+
+    // Remove duplicates
+    billUrls = billUrls.toSet().toList();
+
+    print('Final extracted URLs count: ${billUrls.length}');
+    print('Final URLs: $billUrls');
+
+    return billUrls;
   }
 
-  // Remove duplicates
-  billUrls = billUrls.toSet().toList();
-
-  print('Final extracted URLs count: ${billUrls.length}');
-  print('Final URLs: $billUrls');
-  
-  return billUrls;
-}
-  // Load yields from API with pagination and filters
+  // ✅ IMPROVED: Load yields with proper pagination
   Future<void> loadYields() async {
     try {
       isLoading.value = true;
 
-      print(
-          'Loading yields - Page: ${currentPage.value}, Search: ${searchKeyword.value}');
+      print('=== LOAD YIELDS ===');
+      print('Current Page: ${currentPage.value}');
+      print('Items Per Page: $itemsPerPage');
+      print('Show All Records: ${showAllRecords.value}');
+      print('Search Keyword: "${searchKeyword.value}"');
 
       final response = await YieldService.getAllYields(
         cropId: selectedCropId.value,
@@ -262,110 +271,71 @@ class YieldViewController extends GetxController {
         pageSize: itemsPerPage,
       );
 
-      print('Yields API Response: $response');
+      print('Response received: ${response['statusCode']}');
 
       if (response['success'] == true) {
         final data = response['data'];
-        print('Yields response data: $data');
 
-        if (data != null) {
+        if (data != null && data is Map<String, dynamic>) {
           List<dynamic> yieldsData = [];
 
-          // Handle different API response structures
-          if (data is List) {
-            yieldsData = data;
-            totalCount.value = yieldsData.length;
-            print('Yields data is List with ${yieldsData.length} items');
-          } else if (data is Map) {
-            if (data.containsKey('yields')) {
-              yieldsData = data['yields'] ?? [];
-            } else if (data.containsKey('results')) {
-              yieldsData = data['results'] ?? [];
-            } else if (data.containsKey('data')) {
-              if (data['data'] is List) {
-                yieldsData = data['data'];
-              } else {
-                yieldsData = [data['data']];
-              }
-            } else {
-              // Fallback - try to use the map data directly if it looks like yield data
-              if (data.containsKey('harvest_date') || data.containsKey('id')) {
-                yieldsData = [data];
-              }
-            }
-
-            totalCount.value = data['count'] ??
-                data['total'] ??
-                data['total_count'] ??
-                yieldsData.length;
-            hasNext.value = data['has_next'] ?? false;
-            hasPrevious.value = data['has_previous'] ?? false;
-            totalPages.value = data['total_pages'] ??
-                ((totalCount.value / itemsPerPage).ceil());
-
-            print(
-                'Yields data is Map - yields count: ${yieldsData.length}, total: ${totalCount.value}');
+          // ✅ Extract yields list
+          if (data.containsKey('data') && data['data'] is List) {
+            yieldsData = data['data'];
+          } else if (data.containsKey('results')) {
+            yieldsData = data['results'];
           }
 
-          // Convert to YieldModel objects using the model's fromJson factory
-          List<YieldModel> yields = [];
-          for (var yieldData in yieldsData) {
-            try {
-              if (yieldData is Map<String, dynamic>) {
-                // Use the YieldModel's fromJson factory method instead of service method
-                final yieldModel = YieldModel.fromJson(yieldData);
-                yields.add(yieldModel);
-                print(
-                    'Parsed yield: ${yieldModel.cropName} - ${yieldModel.harvestDate}');
-              } else {
-                print('Invalid yield data format: $yieldData');
-              }
-            } catch (e) {
-              print('Error parsing yield: $e');
-              print('Yield data: $yieldData');
-            }
-          }
+          // ✅ Extract pagination metadata (matching backend exactly)
+          totalCount.value = data['total_count'] ?? yieldsData.length;
+          totalPages.value = data['total_pages'] ?? 1;
+          hasNext.value =
+              data['has_next'] ?? (currentPage.value < totalPages.value);
+          hasPrevious.value = data['has_previous'] ?? (currentPage.value > 1);
 
-          // Apply search filter if needed
+          print('Pagination Info:');
+          print('  Total Count: ${totalCount.value}');
+          print('  Total Pages: ${totalPages.value}');
+          print('  Current Page: ${currentPage.value}');
+          print('  Has Next: ${hasNext.value}');
+          print('  Has Previous: ${hasPrevious.value}');
+
+          // ✅ Convert to model objects
+          List<YieldModel> yields = yieldsData
+              .map((item) {
+                try {
+                  return YieldModel.fromJson(Map<String, dynamic>.from(item));
+                } catch (e) {
+                  print('Error parsing yield: $e');
+                  return null;
+                }
+              })
+              .whereType<YieldModel>()
+              .toList();
+
+          // ✅ Apply search filter locally
           if (searchKeyword.value.isNotEmpty) {
-            yields = yields
-                .where((currentYield) =>
-                    currentYield.cropName
-                        .toLowerCase()
-                        .contains(searchKeyword.value.toLowerCase()) ||
-                    // Fixed: Use farmSegmentNames instead of farmSegmentName
-                    currentYield.farmSegmentNames.any((segment) => segment
-                        .toLowerCase()
-                        .contains(searchKeyword.value.toLowerCase())))
-                .toList();
+            yields = yields.where((currentYield) {
+              final query = searchKeyword.value.toLowerCase();
+              return currentYield.cropName.toLowerCase().contains(query) ||
+                  currentYield.farmSegmentNames
+                      .any((segment) => segment.toLowerCase().contains(query));
+            }).toList();
           }
 
           filteredYields.value = yields;
-          allYields.value = yields;
-
-          print('Final yields list count: ${filteredYields.length}');
-
-          // Update pagination info if not already set
-          if (totalPages.value <= 1) {
-            totalPages.value = (totalCount.value / itemsPerPage).ceil();
-          }
-          hasPrevious.value = currentPage.value > 1;
-          hasNext.value = currentPage.value < totalPages.value;
+          print('Loaded ${yields.length} yields for current page');
         } else {
-          print('Yields response data is null');
-          filteredYields.value = [];
-          allYields.value = [];
-          totalCount.value = 0;
+          print('Response data is null or invalid');
+          _resetYieldsData();
         }
       } else {
-        print('Yields API response not successful: $response');
+        print('API request failed');
         CustomSnackbar.showError(
           title: 'Error',
           message: response['data']?['message'] ?? 'Failed to load yields',
         );
-        filteredYields.value = [];
-        allYields.value = [];
-        totalCount.value = 0;
+        _resetYieldsData();
       }
     } catch (e) {
       print('Error loading yields: $e');
@@ -373,80 +343,230 @@ class YieldViewController extends GetxController {
         title: 'Error',
         message: 'Error loading yields: ${e.toString()}',
       );
-      filteredYields.value = [];
-      allYields.value = [];
-      totalCount.value = 0;
+      _resetYieldsData();
     } finally {
       isLoading.value = false;
     }
   }
 
+  // ✅ NEW: Load ALL records (fetches all pages automatically)
+  Future<void> loadAllYields() async {
+    try {
+      isLoadingAllRecords.value = true;
+
+      print('=== LOADING ALL YIELDS ===');
+
+      List<YieldModel> allLoadedYields = [];
+      int page = 1;
+      bool hasMore = true;
+      int totalFetched = 0;
+
+      while (hasMore) {
+        print('Fetching page $page...');
+
+        final response = await YieldService.getAllYields(
+          cropId: selectedCropId.value,
+          farmSegmentId: selectedFarmSegmentId.value,
+          startDate: selectedStartDate.value != null
+              ? YieldService.formatDateForApi(selectedStartDate.value!)
+              : null,
+          endDate: selectedEndDate.value != null
+              ? YieldService.formatDateForApi(selectedEndDate.value!)
+              : null,
+          hasBills: filterHasBills.value,
+          page: page,
+          pageSize: itemsPerPage,
+        );
+
+        if (response['success'] != true) {
+          print('Failed to fetch page $page');
+          break;
+        }
+
+        final data = response['data'];
+        List<dynamic> yieldsData = [];
+
+        if (data is List) {
+          yieldsData = data;
+        } else if (data is Map) {
+          yieldsData = data['yields'] ?? data['results'] ?? data['data'] ?? [];
+
+          // Update total count from first page
+          if (page == 1) {
+            totalCount.value =
+                data['count'] ?? data['total'] ?? data['total_count'] ?? 0;
+            totalPages.value = data['total_pages'] ??
+                ((totalCount.value / itemsPerPage).ceil());
+          }
+
+          // Check if there are more pages
+          hasMore = data['has_next'] ?? data['next'] != null ?? false;
+        }
+
+        // Parse yields for this page
+        for (var yieldData in yieldsData) {
+          try {
+            if (yieldData is Map<String, dynamic>) {
+              allLoadedYields.add(YieldModel.fromJson(yieldData));
+            }
+          } catch (e) {
+            print('Error parsing yield: $e');
+          }
+        }
+
+        totalFetched += yieldsData.length;
+        print(
+            'Fetched page $page: ${yieldsData.length} yields (Total: $totalFetched)');
+
+        // Safety check
+        if (page > 100) {
+          print('Safety limit reached (100 pages)');
+          break;
+        }
+
+        if (hasMore) {
+          page++;
+        }
+      }
+
+      print('Finished loading all yields: ${allLoadedYields.length} records');
+
+      // Apply local search filter if needed
+      if (searchKeyword.value.isNotEmpty) {
+        allLoadedYields = allLoadedYields
+            .where((currentYield) =>
+                currentYield.cropName
+                    .toLowerCase()
+                    .contains(searchKeyword.value.toLowerCase()) ||
+                currentYield.farmSegmentNames.any((segment) => segment
+                    .toLowerCase()
+                    .contains(searchKeyword.value.toLowerCase())))
+            .toList();
+      }
+
+      allYields.value = allLoadedYields;
+      filteredYields.value = allLoadedYields;
+
+      // Update UI state for "show all" mode
+      showAllRecords.value = true;
+      currentPage.value = 1;
+      hasNext.value = false;
+      hasPrevious.value = false;
+
+      CustomSnackbar.showSuccess(
+        title: 'Success',
+        message: 'Loaded all ${allLoadedYields.length} yields',
+      );
+    } catch (e) {
+      print('Error loading all yields: $e');
+      CustomSnackbar.showError(
+        title: 'Error',
+        message: 'Error loading all yields: ${e.toString()}',
+      );
+    } finally {
+      isLoadingAllRecords.value = false;
+    }
+  }
+
+  // ✅ IMPROVED: Toggle between paginated and "show all" modes
+  void toggleShowAll() async {
+    if (showAllRecords.value) {
+      // Switch back to paginated mode
+      showAllRecords.value = false;
+      currentPage.value = 1;
+      allYields.value = [];
+      await loadYields(); // Load first page
+    } else {
+      // Switch to "show all" mode
+      await loadAllYields(); // Fetch all pages
+    }
+  }
+
+  // Helper to reset yields data
+  void _resetYieldsData() {
+    filteredYields.value = [];
+    allYields.value = [];
+    totalCount.value = 0;
+    totalPages.value = 1;
+    hasNext.value = false;
+    hasPrevious.value = false;
+  }
+
   // Get bill URLs for a specific yield using the model's billUrls getter
   List<String> getYieldBillUrls(YieldModel yield) {
-  print('Getting bill URLs for yield ${yield.id}');
-  
-  // First, try to get URLs from the model's billUrls getter
-  List<String> modelUrls = yield.billUrls;
-  print('Model billUrls: $modelUrls');
-  
-  if (modelUrls.isNotEmpty) {
-    // Process URLs to ensure they're complete
-    List<String> processedUrls = modelUrls
-        .where((url) => url.isNotEmpty)
-        .map((url) => processImageUrl(url))
-        .where((url) => url.isNotEmpty && isValidImageUrl(url))
-        .toList();
-    
-    print('Processed URLs from model: $processedUrls');
-    return processedUrls;
+    print('Getting bill URLs for yield ${yield.id}');
+
+    // First, try to get URLs from the model's billUrls getter
+    List<String> modelUrls = yield.billUrls;
+    print('Model billUrls: $modelUrls');
+
+    if (modelUrls.isNotEmpty) {
+      // Process URLs to ensure they're complete
+      List<String> processedUrls = modelUrls
+          .where((url) => url.isNotEmpty)
+          .map((url) => processImageUrl(url))
+          .where((url) => url.isNotEmpty && isValidImageUrl(url))
+          .toList();
+
+      print('Processed URLs from model: $processedUrls');
+      return processedUrls;
+    }
+
+    // Fallback: Try to extract from bill images directly
+    if (yield.billImages.isNotEmpty) {
+      List<String> imageUrls = yield.billImages
+          .where((billImage) =>
+              billImage.imageUrl != null && billImage.imageUrl!.isNotEmpty)
+          .map((billImage) => processImageUrl(billImage.imageUrl!))
+          .where((url) => url.isNotEmpty && isValidImageUrl(url))
+          .toList();
+
+      print('Processed URLs from billImages: $imageUrls');
+      return imageUrls;
+    }
+
+    print('No bill URLs found for yield ${yield.id}');
+    return [];
   }
-  
-  // Fallback: Try to extract from bill images directly
-  if (yield.billImages.isNotEmpty) {
-    List<String> imageUrls = yield.billImages
-        .where((billImage) => billImage.imageUrl != null && billImage.imageUrl!.isNotEmpty)
-        .map((billImage) => processImageUrl(billImage.imageUrl!))
-        .where((url) => url.isNotEmpty && isValidImageUrl(url))
-        .toList();
-    
-    print('Processed URLs from billImages: $imageUrls');
-    return imageUrls;
-  }
-  
-  // Last resort: Check if there are any raw image URLs in the data
-  // This handles cases where the API might return URLs in unexpected formats
-  if (yield.toJson().containsKey('bill_images') || 
-      yield.toJson().containsKey('billUrls') || 
-      yield.toJson().containsKey('images')) {
-    
-    Map<String, dynamic> yieldData = yield.toJson();
-    List<String> extractedUrls = extractBillUrls(yieldData);
-    print('Extracted URLs from raw data: $extractedUrls');
-    return extractedUrls;
-  }
-  
-  print('No bill URLs found for yield ${yield.id}');
-  return [];
-}
 
   // Search yields
   void runFilter(String keyword) {
     print('Running yield filter with keyword: $keyword');
     searchKeyword.value = keyword;
     currentPage.value = 1;
-    loadYields();
+
+    if (showAllRecords.value) {
+      // Re-filter the all yields list locally
+      if (keyword.isEmpty) {
+        filteredYields.value = allYields;
+      } else {
+        filteredYields.value = allYields
+            .where((currentYield) =>
+                currentYield.cropName
+                    .toLowerCase()
+                    .contains(keyword.toLowerCase()) ||
+                currentYield.farmSegmentNames.any((segment) =>
+                    segment.toLowerCase().contains(keyword.toLowerCase())))
+            .toList();
+      }
+    } else {
+      // Reload from server with new search
+      loadYields();
+    }
   }
 
   // Set filters
   void setCropFilter(String? cropId) {
     selectedCropId.value = cropId;
     currentPage.value = 1;
+    showAllRecords.value = false; // Reset to paginated mode
     loadYields();
   }
 
   void setFarmSegmentFilter(String? farmSegmentId) {
     selectedFarmSegmentId.value = farmSegmentId;
     currentPage.value = 1;
+    showAllRecords.value = false;
     loadYields();
   }
 
@@ -454,35 +574,51 @@ class YieldViewController extends GetxController {
     selectedStartDate.value = startDate;
     selectedEndDate.value = endDate;
     currentPage.value = 1;
+    showAllRecords.value = false;
     loadYields();
   }
 
   void setBillsFilter(bool? hasBills) {
     filterHasBills.value = hasBills;
     currentPage.value = 1;
+    showAllRecords.value = false;
     loadYields();
   }
 
-  // Pagination
+  // ✅ IMPROVED: Pagination methods
   void nextPage() {
-    if (hasNext.value) {
+    if (showAllRecords.value) return;
+    if (hasNext.value && currentPage.value < totalPages.value) {
       currentPage.value++;
       loadYields();
     }
   }
 
   void previousPage() {
-    if (hasPrevious.value) {
+    if (showAllRecords.value) return;
+    if (hasPrevious.value && currentPage.value > 1) {
       currentPage.value--;
       loadYields();
     }
   }
 
   void goToPage(int page) {
-    if (page >= 1 && page <= totalPages.value) {
+    if (showAllRecords.value) return;
+
+    if (page >= 1 && page <= totalPages.value && page != currentPage.value) {
       currentPage.value = page;
       loadYields();
     }
+  }
+
+  void goToFirstPage() {
+    if (showAllRecords.value) return;
+    goToPage(1);
+  }
+
+  void goToLastPage() {
+    if (showAllRecords.value) return;
+    goToPage(totalPages.value);
   }
 
   List<YieldModel> getPaginatedYields() {
@@ -500,11 +636,7 @@ class YieldViewController extends GetxController {
 
       if (response['success'] == true && response['data'] != null) {
         final yieldData = response['data'];
-
-        // If the response has nested data structure
         final actualData = yieldData['data'] ?? yieldData;
-
-        // Use YieldModel's fromJson factory method
         return YieldModel.fromJson(actualData);
       } else {
         String errorMessage = 'Failed to get yield details';
@@ -557,7 +689,6 @@ class YieldViewController extends GetxController {
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'];
 
-        // Handle different response formats
         if (data['bill_images'] != null) {
           return processMultipleImageUrls(data['bill_images']);
         } else if (data['images'] != null) {
@@ -574,8 +705,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Add bill images to yield - Fixed File import issue
-
   Future<void> addBillImagesToYield(
       String yieldId, List<dynamic> imageFiles) async {
     if (imageFiles.isEmpty) {
@@ -587,16 +716,15 @@ class YieldViewController extends GetxController {
     }
 
     try {
-      // Convert List<dynamic> to List<File>
       final List<File> files = imageFiles.map((f) {
         if (f is File) return f;
-        if (f is XFile) return File(f.path); // from image_picker
+        if (f is XFile) return File(f.path);
         throw Exception("Unsupported file type: ${f.runtimeType}");
       }).toList();
 
       final response = await YieldService.addBillImages(
         yieldId: yieldId,
-        imageFiles: files, // ✅ Correct type
+        imageFiles: files,
       );
 
       if (response['success'] == true) {
@@ -617,7 +745,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Remove bill image from yield
   Future<void> removeBillImageFromYield(String yieldId, String imageId) async {
     try {
       final response = await YieldService.removeBillImage(
@@ -643,8 +770,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Replace all bill images for yield - Fixed File import issue
-
   Future<void> replaceBillImagesForYield(
       String yieldId, List<dynamic> imageFiles) async {
     if (imageFiles.isEmpty) {
@@ -656,7 +781,6 @@ class YieldViewController extends GetxController {
     }
 
     try {
-      // Convert to List<File>
       final List<File> files = imageFiles.map((f) {
         if (f is File) return f;
         if (f is XFile) return File(f.path);
@@ -686,7 +810,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Bulk delete yields
   Future<void> bulkDeleteYields(List<String> yieldIds) async {
     if (yieldIds.isEmpty) {
       CustomSnackbar.showError(
@@ -721,7 +844,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Navigate to edit yield
   void editYield(YieldModel editedYield) async {
     final result = await Get.toNamed(Routes.EDIT_YIELD, arguments: editedYield);
 
@@ -730,7 +852,6 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Navigate to add yield
   void addNewYield() async {
     final result = await Get.toNamed(Routes.ADD_YIELD);
 
@@ -739,14 +860,18 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Refresh yields list
+  // ✅ IMPROVED: Refresh yields
   Future<void> refreshYields() async {
     print('Refreshing yields...');
     currentPage.value = 1;
-    await loadYields();
+
+    if (showAllRecords.value) {
+      await loadAllYields();
+    } else {
+      await loadYields();
+    }
   }
 
-  // Clear all filters
   void clearFilters() {
     searchKeyword.value = '';
     searchController.clear();
@@ -756,18 +881,35 @@ class YieldViewController extends GetxController {
     selectedEndDate.value = null;
     filterHasBills.value = null;
     currentPage.value = 1;
+    showAllRecords.value = false;
     loadYields();
   }
 
-  // Get summary text
+  // ✅ IMPROVED: Get summary text
   String getSummaryText() {
-    String summary = 'Total: ${totalCount.value} yields';
+    if (showAllRecords.value) {
+      return 'Showing all ${filteredYields.length} of ${totalCount.value} yields';
+    }
+
+    int startRecord = ((currentPage.value - 1) * itemsPerPage) + 1;
+    int endRecord =
+        (currentPage.value * itemsPerPage).clamp(0, totalCount.value);
+
+    if (totalCount.value == 0) {
+      return 'No yields found';
+    }
+
+    String summary =
+        'Showing $startRecord-$endRecord of ${totalCount.value} yields';
+
     if (searchKeyword.value.isNotEmpty) {
       summary += ' (filtered)';
     }
-    if (currentPage.value > 1 || hasNext.value) {
+
+    if (totalPages.value > 1) {
       summary += ' | Page ${currentPage.value} of ${totalPages.value}';
     }
+
     return summary;
   }
 
@@ -800,12 +942,10 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Format harvest date for display
   String formatHarvestDate(DateTime date) {
     return DateFormat('dd MMM yyyy').format(date);
   }
 
-  // Get yield summary statistics
   Future<YieldSummary?> loadYieldSummary({
     String? cropId,
     String? startDate,
@@ -820,7 +960,6 @@ class YieldViewController extends GetxController {
 
       if (response['success'] == true) {
         print('Yield summary: ${response['data']}');
-        // Use YieldSummary's fromJson factory method
         return YieldSummary.fromJson(response['data']);
       }
       return null;
@@ -830,12 +969,10 @@ class YieldViewController extends GetxController {
     }
   }
 
-  // Helper method to get total quantity for a yield - Use model's getter
   double getTotalYieldQuantity(YieldModel yield) {
-    return yield.totalQuantity; // Use the model's totalQuantity getter
+    return yield.totalQuantity;
   }
 
-  // Helper method to get yield variants summary
   String getYieldVariantsSummary(YieldModel yield) {
     if (yield.yieldVariants.isEmpty) return 'No variants';
 
@@ -847,19 +984,15 @@ class YieldViewController extends GetxController {
     return '${yield.yieldVariants.length} variants';
   }
 
-  // Helper method to check if yield has bills - Use model's getter
   bool yieldHasBills(YieldModel yield) {
-    return yield.hasBills; // Use the model's hasBills getter
+    return yield.hasBills;
   }
 
-  // Helper method to get bill count - Use model's getter
   int getBillCount(YieldModel yield) {
-    return yield.billCount; // Use the model's billCount getter
+    return yield.billCount;
   }
 
-  // Helper method to get farm segments names for a yield
   String getFarmSegmentsText(YieldModel yield) {
-    // Use yieldFarmSegments and map to get farmSegmentName
     final segmentNames = yield.yieldFarmSegments
         .map((segment) => segment.farmSegmentName)
         .toList();
@@ -869,7 +1002,6 @@ class YieldViewController extends GetxController {
     return '${segmentNames.length} segments';
   }
 
-  // Helper method to get variants text
   String getVariantsText(YieldModel yield) {
     if (yield.yieldVariants.isEmpty) return 'No variants';
 
@@ -880,13 +1012,38 @@ class YieldViewController extends GetxController {
     return variantTexts.join(', ');
   }
 
-  // Export helper - get all yields for export
+  // ✅ IMPROVED: Export helper - get all yields for export
   Future<List<YieldModel>> getAllYieldsForExport() async {
     try {
-      final response = await YieldService.getAllYields();
+      // If already in "show all" mode, return current data
+      if (showAllRecords.value && allYields.isNotEmpty) {
+        return allYields;
+      }
 
-      if (response['success'] == true && response['data'] != null) {
-        // Parse the response data to YieldModel objects
+      // Otherwise, fetch all yields
+      print('Fetching all yields for export...');
+
+      List<YieldModel> allExportYields = [];
+      int page = 1;
+      bool hasMore = true;
+
+      while (hasMore) {
+        final response = await YieldService.getAllYields(
+          cropId: selectedCropId.value,
+          farmSegmentId: selectedFarmSegmentId.value,
+          startDate: selectedStartDate.value != null
+              ? YieldService.formatDateForApi(selectedStartDate.value!)
+              : null,
+          endDate: selectedEndDate.value != null
+              ? YieldService.formatDateForApi(selectedEndDate.value!)
+              : null,
+          hasBills: filterHasBills.value,
+          page: page,
+          pageSize: 100, // Use larger page size for export
+        );
+
+        if (response['success'] != true) break;
+
         final data = response['data'];
         List<dynamic> yieldsData = [];
 
@@ -894,20 +1051,21 @@ class YieldViewController extends GetxController {
           yieldsData = data;
         } else if (data is Map) {
           yieldsData = data['yields'] ?? data['results'] ?? data['data'] ?? [];
+          hasMore = data['has_next'] ?? false;
         }
 
-        // Convert to YieldModel objects using the model's fromJson factory
-        List<YieldModel> yields = [];
         for (var yieldData in yieldsData) {
           if (yieldData is Map<String, dynamic>) {
-            yields.add(YieldModel.fromJson(yieldData));
+            allExportYields.add(YieldModel.fromJson(yieldData));
           }
         }
 
-        return yields;
+        if (page > 100) break; // Safety limit
+        if (hasMore) page++;
       }
 
-      return [];
+      print('Export: Fetched ${allExportYields.length} yields');
+      return allExportYields;
     } catch (e) {
       print('Error getting all yields for export: $e');
       return [];

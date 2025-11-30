@@ -1,4 +1,4 @@
-name: farm_agrobot
+name: Farm_Agrobot
 description: "Farm Automation using Bots"
 
 
@@ -30,6 +30,17 @@ dependencies:
   permission_handler: ^12.0.1
   cached_network_image: ^3.3.1
   open_file: ^3.5.10
+  flutter_launcher_icons: ^0.14.4
+  flutter_local_notifications: ^18.0.1
+  workmanager: ^0.7.0
+  flutter_new_badger: ^1.1.1
+  
+
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icons/tractor.png"
+  adaptive_icon_background: "#4CAF50"  
+  
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +61,7 @@ flutter:
         - assets/images/2leaves.png
         - assets/images/exp_avatar.jpg
         - assets/images/avatar.jpg
+        - assets/icons/tractor.png
  
 
   fonts:

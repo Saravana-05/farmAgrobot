@@ -569,7 +569,7 @@ class ViewSales extends StatelessWidget {
                                     SizedBox(height: 2),
                                     Text(
                                       controller
-                                          .formatTimestamp(sale.createdAt),
+                                          .formatTimestamp(sale.harvestDate),
                                       style: textStyle.copyWith(
                                         color: Colors.grey[700],
                                         fontSize: 12,
@@ -824,7 +824,7 @@ class ViewSales extends StatelessWidget {
         ElevatedButton.icon(
           onPressed:
               controller.hasPrevious.value ? controller.previousPage : null,
-          icon: Icon(Icons.chevron_left),
+          icon: Icon(Icons.chevron_left, color: kLightColor, size: 18),
           label: Text('Previous'),
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryColor,
@@ -851,7 +851,7 @@ class ViewSales extends StatelessWidget {
         // Next button
         ElevatedButton.icon(
           onPressed: controller.hasNext.value ? controller.nextPage : null,
-          icon: Icon(Icons.chevron_right),
+          icon: Icon(Icons.chevron_right, color: kLightColor, size: 18),
           label: Text('Next'),
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimaryColor,
@@ -1005,24 +1005,88 @@ class ViewSales extends StatelessWidget {
                           _buildDetailRow(
                               'Crop', sale.cropName, Icons.agriculture),
                           _buildDetailRow(
-                            'Total Amount',
-                            controller.formatCurrency(sale.finalAmount),
-                            Icons.currency_rupee,
+                            'Payment Mode',
+                            sale.paymentMode,
+                            Icons.account_balance_wallet,
                           ),
                           _buildDetailRow(
                             'Payment Status',
                             sale.paymentStatus.toUpperCase(),
                             Icons.payment,
                           ),
-                          _buildDetailRow(
+                        ],
+                      ),
+
+                      SizedBox(height: 16),
+
+                      // Financial Breakdown - NEW SECTION
+                      _buildDetailSection(
+                        'Financial Breakdown',
+                        [
+                          _buildFinancialRow(
+                            'Total Amount',
+                            controller.formatCurrency(sale.totalAmount),
+                            Colors.blue[700]!,
+                            Icons.attach_money,
+                          ),
+                          if (sale.commission > 0)
+                            _buildFinancialRow(
+                              'Commission',
+                              '- ${controller.formatCurrency(sale.commission)}',
+                              Colors.orange[700]!,
+                              Icons.percent,
+                            ),
+                          if (sale.lorryRent > 0)
+                            _buildFinancialRow(
+                              'Lorry Rent',
+                              '- ${controller.formatCurrency(sale.lorryRent)}',
+                              Colors.orange[700]!,
+                              Icons.local_shipping,
+                            ),
+                          if (sale.coolyCharges > 0)
+                            _buildFinancialRow(
+                              'Cooly Charges',
+                              '- ${controller.formatCurrency(sale.coolyCharges)}',
+                              Colors.orange[700]!,
+                              Icons.construction,
+                            ),
+                          if (sale.totalDeductions > 0)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Divider(thickness: 1),
+                            ),
+                          if (sale.totalDeductions > 0)
+                            _buildFinancialRow(
+                              'Total Deductions',
+                              '- ${controller.formatCurrency(sale.totalDeductions)}',
+                              Colors.red[700]!,
+                              Icons.remove_circle_outline,
+                              isBold: true,
+                            ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(thickness: 2, color: kPrimaryColor),
+                          ),
+                          _buildFinancialRow(
+                            'Final Amount',
+                            controller.formatCurrency(sale.finalAmount),
+                            Colors.green[700]!,
+                            Icons.account_balance,
+                            isBold: true,
+                            isLarge: true,
+                          ),
+                          _buildFinancialRow(
+                            'Paid Amount',
+                            controller.formatCurrency(sale.paidAmount),
+                            Colors.green[600]!,
+                            Icons.check_circle_outline,
+                          ),
+                          _buildFinancialRow(
                             'Outstanding Amount',
                             controller.formatCurrency(sale.pendingAmount),
-                            Icons.payment,
-                          ),
-                          _buildDetailRow(
-                            'Payment Mode',
-                            sale.paymentMode,
-                            Icons.account_balance_wallet,
+                            Colors.red[700]!,
+                            Icons.pending_actions,
+                            isBold: sale.pendingAmount > 0,
                           ),
                         ],
                       ),
@@ -1034,13 +1098,15 @@ class ViewSales extends StatelessWidget {
                         _buildDetailSection(
                           'Sale Items',
                           sale.saleVariants
-                              .map((variant) => _buildDetailRow(
-                                    variant.cropVariantName,
-                                    '${variant.quantity} ${variant.unit}',
-                                    Icons.inventory,
-                                  ))
+                              .map((variant) => _buildVariantRow(variant))
                               .toList(),
                         ),
+                        SizedBox(height: 16),
+                      ],
+
+                      // Payment History - NEW SECTION
+                      if (sale.paymentHistory.isNotEmpty) ...[
+                        _buildPaymentHistorySection(sale),
                         SizedBox(height: 16),
                       ],
 
@@ -1148,6 +1214,305 @@ class ViewSales extends StatelessWidget {
           ),
           SizedBox(height: 12),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialRow(
+    String label,
+    String value,
+    Color color,
+    IconData icon, {
+    bool isBold = false,
+    bool isLarge = false,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isBold ? color.withOpacity(0.3) : Colors.grey[200]!,
+          width: isBold ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: isLarge ? 24 : 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: isLarge ? 14 : 12,
+                color: Colors.grey[700],
+                fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isLarge ? 18 : 14,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// NEW: Variant Row Widget
+  Widget _buildVariantRow(SaleVariant variant) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.inventory, color: kSecondaryColor, size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  variant.cropVariantName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quantity',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '${variant.quantity} ${variant.unit}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Rate',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    controller.formatCurrency(variant.amountPerUnit),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    controller.formatCurrency(variant.totalAmount),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[700],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// NEW: Payment History Section
+  Widget _buildPaymentHistorySection(SaleModel sale) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.payment, color: kSecondaryColor),
+              SizedBox(width: 8),
+              Text(
+                'Payment History',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: kSecondaryColor,
+                ),
+              ),
+              Spacer(),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${sale.paymentHistory.length} payment${sale.paymentHistory.length > 1 ? 's' : ''}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          ...sale.paymentHistory
+              .map((payment) => _buildPaymentHistoryRow(payment))
+              .toList(),
+        ],
+      ),
+    );
+  }
+
+// NEW: Payment History Row Widget
+  Widget _buildPaymentHistoryRow(PaymentHistory payment) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  _getPaymentMethodIcon(payment.paymentMethod),
+                  SizedBox(width: 8),
+                  Text(
+                    payment.paymentMethod.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                controller.formatCurrency(payment.paymentAmount),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
+              SizedBox(width: 4),
+              Text(
+                controller.formatTimestamp(payment.paymentDate),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                ),
+              ),
+              if (payment.paymentReference?.isNotEmpty == true) ...[
+                SizedBox(width: 12),
+                Icon(Icons.receipt_long, size: 12, color: Colors.grey[600]),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    payment.paymentReference!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (payment.notes?.isNotEmpty == true) ...[
+            SizedBox(height: 6),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.note, size: 12, color: Colors.grey[600]),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      payment.notes!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[700],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

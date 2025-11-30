@@ -8,7 +8,6 @@ import '../../../global_widgets/elevated_button/custom_elevated_btn.dart';
 import '../../../global_widgets/menu_app_bar/menu_app_bar.dart';
 import '../controller/add_sales_controller.dart';
 
-
 class AddSale extends GetView<AddSaleController> {
   const AddSale({super.key});
 
@@ -90,7 +89,7 @@ class AddSale extends GetView<AddSaleController> {
       // Access observable variables directly within Obx
       final selectedId = controller.selectedMerchantId;
       final merchants = controller.merchants;
-      
+
       return DropdownButtonFormField<String>(
         value: selectedId.isEmpty ? null : selectedId,
         decoration: InputDecoration(
@@ -156,7 +155,7 @@ class AddSale extends GetView<AddSaleController> {
     return Obx(() {
       final selectedPayment = controller.selectedPaymentMode;
       final paymentModes = controller.paymentModes;
-      
+
       return DropdownButtonFormField<String>(
         value: selectedPayment.isEmpty ? null : selectedPayment,
         decoration: InputDecoration(
@@ -192,7 +191,7 @@ class AddSale extends GetView<AddSaleController> {
     return Obx(() {
       final selectedYield = controller.selectedYieldId;
       final availableYields = controller.availableYields;
-      
+
       return DropdownButtonFormField<String>(
         value: selectedYield.isEmpty ? null : selectedYield,
         decoration: InputDecoration(
@@ -225,7 +224,8 @@ class AddSale extends GetView<AddSaleController> {
   /// -------------------------------
   /// Image Upload Section - FIXED
   /// -------------------------------
-  Widget _buildImageUploadSection(BuildContext context, AddSaleController controller) {
+  Widget _buildImageUploadSection(
+      BuildContext context, AddSaleController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -265,7 +265,10 @@ class AddSale extends GetView<AddSaleController> {
                   onPressed: maxReached
                       ? null
                       : () => _showImageSourceDialog(context, controller),
-                  icon: const Icon(Icons.add_a_photo),
+                  icon: const Icon(
+                    Icons.add_a_photo,
+                    color: kLightColor,
+                  ),
                   label: const Text('Add Images'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryColor,
@@ -276,19 +279,20 @@ class AddSale extends GetView<AddSaleController> {
               }),
             ),
             const SizedBox(width: 10),
-            Obx(() {
-              final maxReached = controller.maxImagesReached;
-              return ElevatedButton.icon(
-                onPressed: maxReached ? null : () => controller.pickMultipleImages(),
-                icon: const Icon(Icons.photo_library),
-                label: const Text('Gallery'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: kLightColor,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              );
-            }),
+            // Obx(() {
+            //   final maxReached = controller.maxImagesReached;
+            //   return ElevatedButton.icon(
+            //     onPressed:
+            //         maxReached ? null : () => controller.pickMultipleImages(),
+            //     icon: const Icon(Icons.photo_library),
+            //     label: const Text('Gallery'),
+            //     style: ElevatedButton.styleFrom(
+            //       backgroundColor: Colors.green,
+            //       foregroundColor: kLightColor,
+            //       padding: const EdgeInsets.symmetric(vertical: 12),
+            //     ),
+            //   );
+            // }),
           ],
         ),
         const SizedBox(height: 15),
@@ -297,7 +301,7 @@ class AddSale extends GetView<AddSaleController> {
         Obx(() {
           final images = controller.billImages;
           final isCompressing = controller.isCompressing;
-          
+
           if (images.isEmpty) {
             return Container(
               height: 100,

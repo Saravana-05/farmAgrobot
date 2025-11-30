@@ -1,4 +1,3 @@
-import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
@@ -6,6 +5,7 @@ import '../../../config/api.dart';
 import '../../../core/utils/tamil_text_handler.dart';
 import '../../../data/models/employee/emp_model.dart';
 import '../../../data/services/employee/emp_service.dart';
+import '../../../global_widgets/custom_snackbar/snackbar.dart';
 
 class EmployeeViewController extends GetxController {
   var searchKeyword = ''.obs;
@@ -743,34 +743,33 @@ class EmployeeViewController extends GetxController {
       return;
     }
 
-    // Filter out null or empty IDs
     final validIds = employeeIds.where((id) => id.trim().isNotEmpty).toList();
 
     if (validIds.isEmpty) {
-      _showErrorSnackbar('Error', 'No valid employee IDs provided');
+      _showErrorSnackbar('Error', 'No valid employee IDs found');
       return;
     }
 
-    String statusText = newStatus ? 'activate' : 'deactivate';
-    String actionText = newStatus ? 'Activate' : 'Deactivate';
+    final actionText = newStatus ? "Activate" : "Deactivate";
+    final verb = newStatus ? "activate" : "deactivate";
 
-    // Show confirmation dialog
+    // Confirm dialog
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
-        title: Text('$actionText ${validIds.length} Employees'),
+        title: Text("$actionText ${validIds.length} Employees"),
         content: Text(
-            'Are you sure you want to $statusText ${validIds.length} selected employees?'),
+            "Are you sure you want to $verb ${validIds.length} employees?"),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: Text('Cancel'),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            style: TextButton.styleFrom(
-              foregroundColor: newStatus ? Colors.green : Colors.orange,
+            child: Text(
+              actionText,
+              style: TextStyle(color: newStatus ? Colors.green : Colors.red),
             ),
-            child: Text(actionText),
           ),
         ],
       ),
@@ -778,79 +777,86 @@ class EmployeeViewController extends GetxController {
 
     if (confirmed != true) return;
 
+    isLoading.value = true;
+
     try {
-      isLoading.value = true;
       int successCount = 0;
       int failureCount = 0;
       List<String> failedEmployees = [];
 
-      // Process each employee
-      for (String employeeId in validIds) {
-        try {
-          final result = await EmployeeService.updateEmployeeStatus(
-            employeeId: employeeId,
-            isActive: newStatus,
-          );
+      // -------------------------------
+      // 🚀 PARALLEL PROCESS (FAST)
+      // -------------------------------
+      List<Future> tasks = validIds.map((employeeId) async {
+        final result = await EmployeeService.updateEmployeeStatus(
+          employeeId: employeeId,
+          isActive: newStatus,
+        );
 
-          if (result['success']) {
-            successCount++;
+        if (result['success'] == true) {
+          successCount++;
 
-            // Update local list immediately
-            final updatedEmployees = employees.map((emp) {
-              if (emp.id == employeeId) {
-                return emp.copyWith(
-                  status: newStatus,
-                  updatedAt: DateTime.now(),
-                );
-              }
-              return emp;
-            }).toList();
-            employees.value = updatedEmployees;
-          } else {
-            failureCount++;
-            // Find employee name for error reporting
-            Employee? emp =
-                employees.firstWhereOrNull((e) => e.id == employeeId);
-            failedEmployees.add(emp?.name ?? employeeId);
-          }
-        } catch (e) {
+          // update local list
+          employees.value = employees.map((e) {
+            if (e.id == employeeId) {
+              return e.copyWith(
+                status: newStatus,
+                updatedAt: DateTime.now(),
+              );
+            }
+            return e;
+          }).toList();
+        } else {
           failureCount++;
           Employee? emp = employees.firstWhereOrNull((e) => e.id == employeeId);
           failedEmployees.add(emp?.name ?? employeeId);
-          print('Error updating employee $employeeId: $e');
-        }
-      }
 
-      // Force UI refresh after bulk update
+          print("❌ Error updating $employeeId → ${result['message']}");
+        }
+      }).toList();
+
+      await Future.wait(tasks);
+
+      // force UI update
       employees.refresh();
+
       lastUpdateTimestamp.value = DateTime.now().millisecondsSinceEpoch;
 
-      // Show result summary
+      // -------------------------------
+      // 🔥 RESULT SUMMARY
+      // -------------------------------
       if (successCount > 0) {
-        String message =
-            '$successCount employees ${newStatus ? "activated" : "deactivated"} successfully';
-        if (failureCount > 0) {
-          message += ', $failureCount failed';
-        }
-        _showSuccessSnackbar('Bulk Update Result', message);
+        String msg =
+            "$successCount employees ${newStatus ? "activated" : "deactivated"}";
+
+        if (failureCount > 0) msg += ", $failureCount failed";
+
+        _showSuccessSnackbar("Bulk Update Complete", msg);
       }
 
       if (failureCount > 0 && successCount == 0) {
         _showErrorSnackbar(
-            'Bulk Update Failed', 'Failed to update $failureCount employees');
+            "Bulk Update Failed", "Failed to update $failureCount employees");
       }
 
-      // Refresh statistics in background
+      if (failedEmployees.isNotEmpty) {
+        print("❌ Failed Employees:");
+        for (var name in failedEmployees) {
+          print("- $name");
+        }
+      }
+
+      // Refresh stats
       loadStatistics();
 
-      // Refresh the entire list after a short delay to ensure consistency
-      Future.delayed(Duration(milliseconds: 500), () {
+      // refresh full list after delay
+      Future.delayed(const Duration(milliseconds: 400), () {
         refreshEmployees();
       });
-    } catch (e) {
-      _showErrorSnackbar(
-          'Network Error', 'Failed to perform bulk status update');
-      print('Error in bulk status update: $e');
+    } catch (e, s) {
+      print("Exception in bulk update: $e");
+      print(s);
+      _showErrorSnackbar("Error", "Unexpected error occurred");
     } finally {
       isLoading.value = false;
     }

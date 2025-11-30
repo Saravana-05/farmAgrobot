@@ -380,148 +380,78 @@ class EmployeeService {
     bool useAction = false,
   }) async {
     try {
-      // Validate parameters
       if (employeeId.trim().isEmpty) {
         return {
           'success': false,
-          'data': {'message': 'Employee ID is required'}
+          'message': 'Employee ID is required',
         };
       }
 
-      // ✅ FIX: Replace {id} placeholder with actual employeeId
       final url = statusEmployeeUrl.replaceAll('{id}', employeeId);
 
-      // Prepare the request body based on API specification
-      Map<String, dynamic> requestBody;
+      // Prepare body
+      final requestBody = useAction
+          ? {'action': isActive ? 'activate' : 'deactivate'}
+          : {'status': isActive};
 
-      if (useAction) {
-        // Use action format: "activate" or "deactivate"
-        requestBody = {'action': isActive ? 'activate' : 'deactivate'};
-      } else {
-        // ✅ FIX: Use boolean status format (true for active, false for inactive)
-        requestBody = {
-          'status': isActive // Send as boolean, NOT integer
-        };
-      }
+      print("Calling API: $url");
+      print("Request Body: ${jsonEncode(requestBody)}");
 
-      // Make the API call using PATCH method with the corrected URL
       final response = await http
           .patch(
             Uri.parse(url),
             headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
+              "Content-Type": "application/json",
+              "Accept": "application/json",
             },
             body: jsonEncode(requestBody),
           )
-          .timeout(Duration(seconds: 30));
+          .timeout(const Duration(seconds: 30));
 
-      print('Calling API: $url');
-      print(
-          'Request body: ${jsonEncode(requestBody)}'); // ✅ Debug: Show what we're sending
-      print('Status update response status: ${response.statusCode}');
-      print('Status update response body: ${response.body}');
+      print("Status: ${response.statusCode}");
+      print("Response: ${response.body}");
 
-      // Parse the response
-      Map<String, dynamic> responseData;
+      // Parse JSON safely
+      Map<String, dynamic> json;
       try {
-        responseData = jsonDecode(response.body);
-      } catch (e) {
-        print('JSON decode error: $e');
+        json = jsonDecode(response.body);
+      } catch (_) {
         return {
           'success': false,
-          'data': {'message': 'Invalid JSON response from server'}
+          'message': 'Invalid JSON response from server',
         };
       }
 
-      // Handle different response status codes
+      // ---------- SUCCESS CASE ----------
       if (response.statusCode == 200) {
-        // Check the response status field from Django API
-        if (responseData['status'] == 'success') {
-          // ✅ FIX: Django returns boolean status, no need to convert
-          return {
-            'success': true,
-            'data': responseData,
-          };
-        } else if (responseData['status'] == 'warning') {
-          // Employee already has the requested status
-          // ✅ FIX: Django returns boolean status, no need to convert
-          return {
-            'success': true,
-            'data': responseData,
-          };
-        } else {
-          // API returned error status
-          return {
-            'success': false,
-            'data': {
-              'message': responseData['message'] ?? 'Unknown error occurred',
-            }
-          };
-        }
-      } else if (response.statusCode == 400) {
-        // Bad request - validation error
+        final apiStatus = json['status'];
+
         return {
-          'success': false,
-          'data': {
-            'message': responseData['message'] ?? 'Invalid request data',
-            'status_code': response.statusCode,
-          }
-        };
-      } else if (response.statusCode == 404) {
-        // Employee not found
-        return {
-          'success': false,
-          'data': {
-            'message': responseData['message'] ?? 'Employee not found',
-            'status_code': response.statusCode,
-          }
-        };
-      } else if (response.statusCode == 500) {
-        // Internal server error
-        return {
-          'success': false,
-          'data': {
-            'message': responseData['message'] ?? 'Internal server error',
-            'status_code': response.statusCode,
-          }
-        };
-      } else {
-        // Other HTTP errors
-        return {
-          'success': false,
-          'data': {
-            'message': responseData['message'] ?? 'Server error occurred',
-            'status_code': response.statusCode,
-          }
+          'success': apiStatus == 'success' || apiStatus == 'warning',
+          'message': json['message'] ?? '',
+          'data': json['data'],
         };
       }
-    } on SocketException catch (e) {
-      print('Network error in updateEmployeeStatus: $e');
+
+      // ---------- ERROR CASES ----------
       return {
         'success': false,
-        'data': {
-          'message':
-              'Network connection error. Please check your internet connection.'
-        }
+        'message': json['message'] ?? 'Server error occurred',
       };
-    } on TimeoutException catch (e) {
-      print('Timeout error in updateEmployeeStatus: $e');
+    } on TimeoutException {
       return {
         'success': false,
-        'data': {'message': 'Request timeout. Please try again.'}
+        'message': 'Request timeout. Please try again.',
       };
-    } on FormatException catch (e) {
-      print('JSON parsing error in updateEmployeeStatus: $e');
+    } on SocketException {
       return {
         'success': false,
-        'data': {'message': 'Invalid response format from server.'}
+        'message': 'No internet connection.',
       };
     } catch (e) {
-      print('Unexpected error in updateEmployeeStatus: $e');
       return {
         'success': false,
-        'data': {'message': 'An unexpected error occurred: ${e.toString()}'}
+        'message': 'Unexpected error: $e',
       };
     }
   }

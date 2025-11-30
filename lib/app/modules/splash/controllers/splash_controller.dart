@@ -4,9 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/services/connectivity_service.dart';
+import '../../../data/services/engagement/app_engagement_service.dart';
 
 class SplashController extends GetxController with GetTickerProviderStateMixin {
-  final ConnectivityService connectivityService = Get.find<ConnectivityService>();
+  final ConnectivityService connectivityService =
+      Get.find<ConnectivityService>();
+
+  // Make engagement service nullable and lazy load it
+  AppEngagementService? _engagementService;
+  AppEngagementService get engagementService {
+    _engagementService ??= Get.find<AppEngagementService>();
+    return _engagementService!;
+  }
 
   late AnimationController _bgController;
   late AnimationController _leafController;
@@ -26,11 +35,16 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   final _displayedText = "".obs;
   final _showNavigationButton = false.obs;
 
+  // Engagement tracking
+  final RxBool isFarmSad = false.obs;
+  final RxInt hoursSinceLastOpen = 0.obs;
+
   // Getters for animations
   Animation<double> get bgAnimation => _bgAnimation;
   Animation<double> get leafAnimation => _leafAnimation;
   Animation<double> get logoOpacityAnimation => _logoOpacityAnimation;
-  Animation<double> get secondImageOpacityAnimation => _secondImageOpacityAnimation;
+  Animation<double> get secondImageOpacityAnimation =>
+      _secondImageOpacityAnimation;
   Animation<double> get textOpacityAnimation => _textOpacityAnimation;
   Animation<double> get navButtonAnimation => _navButtonAnimation;
 
@@ -43,6 +57,31 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
     super.onInit();
     _initializeAnimations();
     _startAnimationSequence();
+    // Check engagement status after a delay to ensure services are ready
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _checkEngagementStatus();
+    });
+  }
+
+  // Check if farm needs attention
+  Future<void> _checkEngagementStatus() async {
+    try {
+      // Check if service exists
+      if (!Get.isRegistered<AppEngagementService>()) {
+        debugPrint(
+            'AppEngagementService not registered, skipping engagement check');
+        return;
+      }
+
+      final hours = await engagementService.getHoursSinceLastOpen();
+      hoursSinceLastOpen.value = hours;
+      isFarmSad.value = hours >= 24;
+    } catch (e) {
+      debugPrint('Error checking engagement status: $e');
+      // Set defaults if error occurs
+      hoursSinceLastOpen.value = 0;
+      isFarmSad.value = false;
+    }
   }
 
   void _initializeAnimations() {
@@ -57,8 +96,9 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
       curve: Curves.easeInOut,
     );
 
+    // Adjust leaf animation speed based on mood
     _leafController = AnimationController(
-      duration: const Duration(seconds: 3),
+      duration: Duration(seconds: isFarmSad.value ? 4 : 3), // Slower when sad
       vsync: this,
     );
 
@@ -121,34 +161,40 @@ class SplashController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void _startAnimationSequence() async {
-    // Start background animation first
-    _bgController.forward();
+    try {
+      // Start background animation first
+      _bgController.forward();
 
-    // Leaf animation
-    await _leafController.forward();
+      // Leaf animation
+      await _leafController.forward();
 
-    // Delay before logo
-    await Future.delayed(const Duration(milliseconds: 500));
-    await _logoController.forward();
+      // Delay before logo
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _logoController.forward();
 
-    // Delay before second image
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _secondImageController.forward();
+      // Delay before second image
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _secondImageController.forward();
 
-    // Delay before text
-    await Future.delayed(const Duration(milliseconds: 300));
-    _textController.forward();
+      // Delay before text
+      await Future.delayed(const Duration(milliseconds: 300));
+      _textController.forward();
 
-    // Typing effect for text
-    for (int i = 0; i <= motto.length; i++) {
-      _displayedText.value = motto.substring(0, i);
-      await Future.delayed(const Duration(milliseconds: 80));
+      // Typing effect for text
+      for (int i = 0; i <= motto.length; i++) {
+        _displayedText.value = motto.substring(0, i);
+        await Future.delayed(const Duration(milliseconds: 80));
+      }
+
+      // Show navigation button
+      await Future.delayed(const Duration(milliseconds: 500));
+      _showNavigationButton.value = true;
+      _navButtonController.forward();
+    } catch (e) {
+      debugPrint('Error in animation sequence: $e');
+      // Show navigation button immediately if error occurs
+      _showNavigationButton.value = true;
     }
-
-    // Show navigation button
-    await Future.delayed(const Duration(milliseconds: 500));
-    _showNavigationButton.value = true;
-    _navButtonController.forward();
   }
 
   void navigateToNext() {

@@ -1,10 +1,11 @@
-import 'package:farm_agrobot/app/global_widgets/custom_snackbar/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/models/crops/crop_model.dart';
 import '../../../data/services/crop_variant/crop_variant_service.dart';
 import '../../../data/services/crops/crop_service.dart';
+import '../../../global_widgets/custom_snackbar/snackbar.dart';
 import '../../../routes/app_pages.dart';
+
 
 class AddCropVariantController extends GetxController {
   // Observable variables

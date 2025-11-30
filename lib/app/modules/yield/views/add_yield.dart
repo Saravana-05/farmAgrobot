@@ -49,8 +49,6 @@ class AddYield extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildImageUploadSection(controller),
                 const SizedBox(height: 20),
-                _buildBillUrlsSection(controller),
-                const SizedBox(height: 30),
                 _buildSaveButton(controller),
               ],
             ),
@@ -350,7 +348,7 @@ class AddYield extends StatelessWidget {
                         onPressed: controller.maxImagesReached
                             ? null
                             : () => _showImageSourceDialog(context, controller),
-                        icon: const Icon(Icons.add_a_photo),
+                        icon: const Icon(Icons.add_a_photo, color: kLightColor),
                         label: const Text('Add Images'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryColor,
@@ -361,19 +359,19 @@ class AddYield extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(width: 10),
-            Obx(() => ElevatedButton.icon(
-                  onPressed: controller.maxImagesReached
-                      ? null
-                      : () => controller.pickMultipleImages(),
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Gallery'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: kLightColor,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                )),
+            // const SizedBox(width: 10),
+            // Obx(() => ElevatedButton.icon(
+            //       onPressed: controller.maxImagesReached
+            //           ? null
+            //           : () => controller.pickMultipleImages(),
+            //       icon: const Icon(Icons.photo_library),
+            //       label: const Text('Gallery'),
+            //       style: ElevatedButton.styleFrom(
+            //         backgroundColor: Colors.green,
+            //         foregroundColor: kLightColor,
+            //         padding: const EdgeInsets.symmetric(vertical: 12),
+            //       ),
+            //     )),
           ],
         ),
         const SizedBox(height: 15),

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:farm_agrobot/app/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +7,7 @@ import '../../../core/values/app_colors.dart';
 import '../../../core/utils/tamil_text_handler.dart';
 import '../../../data/services/employee/emp_service.dart';
 import '../../../global_widgets/custom_snackbar/snackbar.dart';
+import '../../../routes/app_pages.dart';
 import 'emp_view_controller.dart';
 
 class EditEmployeeController extends GetxController {

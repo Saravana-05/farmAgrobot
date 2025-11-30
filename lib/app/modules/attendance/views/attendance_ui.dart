@@ -6,6 +6,7 @@ import '../../../data/models/attendance/attendance_record_model.dart';
 import '../../../routes/app_pages.dart';
 import '../controller/attendance_UI_controller.dart';
 import '../controller/employee_details_controller.dart';
+import 'emp_weekly_status_button.dart';
 
 class AttendanceUIScreen extends StatelessWidget {
   const AttendanceUIScreen({super.key});
@@ -232,12 +233,11 @@ class AttendanceUIScreen extends StatelessWidget {
       double remainingAmount =
           controller.grandTotalWages.value - totalPaidAmount;
 
-      bool allEmployeesPaid = controller.employees.isNotEmpty &&
-          controller.employees.every(
-              (employee) => controller.getRemainingAmount(employee.id) <= 0);
+      // ✅ USE CONTROLLER'S wagesPaid FLAG INSTEAD OF CALCULATING HERE
+      bool allWagesPaid = controller.wagesPaid.value;
 
-      bool hasUnpaidEmployees = controller.employees
-          .any((employee) => controller.getRemainingAmount(employee.id) > 0);
+      // Calculate if there are unpaid employees (for showing Pay Wages button)
+      bool hasUnpaidEmployees = !allWagesPaid && remainingAmount > 0;
 
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
@@ -328,7 +328,8 @@ class AttendanceUIScreen extends StatelessWidget {
                 Expanded(
                   child: Container(),
                 ),
-                if (hasUnpaidEmployees && remainingAmount > 0)
+                // ✅ FIXED: Show Pay Wages button when hasUnpaidEmployees is true
+                if (hasUnpaidEmployees)
                   ElevatedButton.icon(
                     onPressed: () =>
                         _showPayWagesDialog(controller, remainingAmount),
@@ -347,7 +348,8 @@ class AttendanceUIScreen extends StatelessWidget {
                       elevation: 1,
                     ),
                   )
-                else if (allEmployeesPaid && controller.employees.isNotEmpty)
+                // ✅ FIXED: Show All Wages Paid only when controller.wagesPaid is true
+                else if (allWagesPaid && controller.employees.isNotEmpty)
                   Row(
                     children: [
                       const Icon(Icons.check_circle,
@@ -600,6 +602,11 @@ class AttendanceUIScreen extends StatelessWidget {
             children: [
               if (controller.useCustomOrder.value)
                 const Icon(Icons.reorder, color: kPrimaryColor, size: 14),
+              IconButton(
+                icon: Icon(Icons.event_available),
+                tooltip: 'Manage Weekly Status',
+                onPressed: () => Get.to(() => EmployeeWeeklyStatusScreen()),
+              ),
               TextButton.icon(
                 onPressed: controller.showEmployeeOrderDialog,
                 icon: const Icon(Icons.sort, size: 14),

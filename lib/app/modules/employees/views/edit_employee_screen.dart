@@ -1,6 +1,6 @@
-import 'package:farm_agrobot/app/config/api.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../config/api.dart';
 import '../../../core/values/app_colors.dart';
 import '../../../global_widgets/bottom_navigation/bottom_navigation_widget.dart';
 import '../../../global_widgets/drawer/views/drawer.dart';

@@ -10,7 +10,8 @@ class DashboardService extends GetxService {
   /// Returns current year, last year, current month, last month, and breakdown data
   Future<Map<String, dynamic>> getExpensesDashboardStats() async {
     try {
-      print('Attempting to fetch expenses dashboard stats from: $dashboardExpenseStatsUrl');
+      print(
+          'Attempting to fetch expenses dashboard stats from: $dashboardExpenseStatsUrl');
 
       final response = await http.get(
         Uri.parse(dashboardExpenseStatsUrl),
@@ -26,24 +27,27 @@ class DashboardService extends GetxService {
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
+        final data = jsonResponse['data'] as Map<String, dynamic>;
         print('Expenses dashboard stats response: $jsonResponse');
-        
+
         return {
           'success': true,
-          'data': jsonResponse['data'],
+          'data': data, // Return full data structure
           'message': jsonResponse['message'],
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch expenses dashboard stats';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch expenses dashboard stats';
         } catch (e) {
-          errorMessage = 'Failed to fetch expenses dashboard stats (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch expenses dashboard stats (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -53,7 +57,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -84,7 +89,8 @@ class DashboardService extends GetxService {
   /// Returns monthly expense trends with count and amount for each month
   Future<Map<String, dynamic>> getExpensesMonthlyTrendData() async {
     try {
-      print('Attempting to fetch expenses monthly trend data from: $monthlyExpenseTrendUrl');
+      print(
+          'Attempting to fetch expenses monthly trend data from: $monthlyExpenseTrendUrl');
 
       final response = await http.get(
         Uri.parse(monthlyExpenseTrendUrl),
@@ -101,7 +107,7 @@ class DashboardService extends GetxService {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Expenses monthly trend response: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -109,15 +115,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch expenses monthly trend data';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch expenses monthly trend data';
         } catch (e) {
-          errorMessage = 'Failed to fetch expenses monthly trend data (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch expenses monthly trend data (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -127,7 +135,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -158,7 +167,8 @@ class DashboardService extends GetxService {
   /// Returns yearly and monthly comparison data with percentage changes
   Future<Map<String, dynamic>> getExpensesComparisonStats() async {
     try {
-      print('Attempting to fetch expenses comparison stats from: $comparisonExpenseStatsUrl');
+      print(
+          'Attempting to fetch expenses comparison stats from: $comparisonExpenseStatsUrl');
 
       final response = await http.get(
         Uri.parse(comparisonExpenseStatsUrl),
@@ -170,12 +180,13 @@ class DashboardService extends GetxService {
         },
       );
 
-      print('Expenses comparison stats response status: ${response.statusCode}');
+      print(
+          'Expenses comparison stats response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Expenses comparison stats response: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -183,15 +194,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch expenses comparison stats';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch expenses comparison stats';
         } catch (e) {
-          errorMessage = 'Failed to fetch expenses comparison stats (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch expenses comparison stats (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -201,7 +214,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -230,7 +244,8 @@ class DashboardService extends GetxService {
 
   /// Get expenses summary by period type
   /// [periodType] can be: 'current_year', 'last_year', 'current_month', 'last_month', 'all_time'
-  Future<Map<String, dynamic>> getExpensesSummaryByPeriod(String periodType) async {
+  Future<Map<String, dynamic>> getExpensesSummaryByPeriod(
+      String periodType) async {
     if (periodType.isEmpty) {
       return {
         'success': false,
@@ -257,7 +272,7 @@ class DashboardService extends GetxService {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Expenses summary response for $periodType: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -265,15 +280,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch expenses summary data';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch expenses summary data';
         } catch (e) {
-          errorMessage = 'Failed to fetch expenses summary data (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch expenses summary data (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -283,7 +300,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -341,17 +359,17 @@ class DashboardService extends GetxService {
     try {
       // Get dashboard stats which includes time periods and breakdowns
       final dashboardResult = await getExpensesDashboardStats();
-      
+
       if (!dashboardResult['success']) {
         return dashboardResult;
       }
 
       final dashboardData = dashboardResult['data'];
-      
+
       // Extract the most important data for overview
       final timePeriods = dashboardData['time_periods'];
       final currentYearBreakdown = dashboardData['current_year_breakdown'];
-      
+
       return {
         'success': true,
         'data': {
@@ -380,7 +398,7 @@ class DashboardService extends GetxService {
   /// Static method to get all expenses dashboard data at once (for initialization)
   static Future<Map<String, dynamic>> getAllExpensesDashboardData() async {
     final DashboardService service = DashboardService();
-    
+
     try {
       final futures = await Future.wait([
         service.getExpensesDashboardStats(),
@@ -393,10 +411,9 @@ class DashboardService extends GetxService {
       final comparisonStats = futures[2];
 
       // Check if any request failed
-      if (!dashboardStats['success'] || 
-          !monthlyTrend['success'] || 
+      if (!dashboardStats['success'] ||
+          !monthlyTrend['success'] ||
           !comparisonStats['success']) {
-        
         // Return the first error encountered
         for (var result in futures) {
           if (!result['success']) {
@@ -426,15 +443,16 @@ class DashboardService extends GetxService {
 
   /// Get comprehensive revenue dashboard statistics
   /// Returns current year, last year, current month, last month, and breakdown data
-  Future<Map<String, dynamic>> getRevenueDashboardStats({String? merchantId}) async {
+  Future<Map<String, dynamic>> getRevenueDashboardStats(
+      {String? merchantId}) async {
     try {
       String url = dashboardRevenueUrl;
-      
+
       // Add merchant filter if provided
       if (merchantId != null && merchantId.isNotEmpty) {
         url += '?merchant_id=$merchantId';
       }
-      
+
       print('Attempting to fetch revenue dashboard stats from: $url');
 
       final response = await http.get(
@@ -452,7 +470,7 @@ class DashboardService extends GetxService {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Revenue dashboard stats response: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -460,15 +478,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch revenue dashboard stats';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch revenue dashboard stats';
         } catch (e) {
-          errorMessage = 'Failed to fetch revenue dashboard stats (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch revenue dashboard stats (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -478,7 +498,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -507,15 +528,16 @@ class DashboardService extends GetxService {
 
   /// Get quick statistics with time period comparisons for dashboard cards
   /// Optimized for speed and minimal data transfer
-  Future<Map<String, dynamic>> getQuickRevenueStats({String? merchantId}) async {
+  Future<Map<String, dynamic>> getQuickRevenueStats(
+      {String? merchantId}) async {
     try {
       String url = dashboardQuickStatsUrl;
-      
+
       // Add merchant filter if provided
       if (merchantId != null && merchantId.isNotEmpty) {
         url += '?merchant_id=$merchantId';
       }
-      
+
       print('Attempting to fetch quick revenue stats from: $url');
 
       final response = await http.get(
@@ -533,7 +555,7 @@ class DashboardService extends GetxService {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Quick revenue stats response: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -541,15 +563,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch quick revenue stats';
+          errorMessage =
+              errorResponse['message'] ?? 'Failed to fetch quick revenue stats';
         } catch (e) {
-          errorMessage = 'Failed to fetch quick revenue stats (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch quick revenue stats (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -559,7 +583,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -601,12 +626,12 @@ class DashboardService extends GetxService {
 
     try {
       String url = '$dashboardRevenueByPeriodUrl$periodType/';
-      
+
       // Add merchant filter if provided
       if (merchantId != null && merchantId.isNotEmpty) {
         url += '?merchant_id=$merchantId';
       }
-      
+
       print('Attempting to fetch revenue summary for $periodType from: $url');
 
       final response = await http.get(
@@ -624,7 +649,7 @@ class DashboardService extends GetxService {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         print('Revenue summary response for $periodType: $jsonResponse');
-        
+
         return {
           'success': true,
           'data': jsonResponse['data'],
@@ -632,15 +657,17 @@ class DashboardService extends GetxService {
         };
       } else {
         print('Server response: ${response.statusCode} - ${response.body}');
-        
+
         String errorMessage;
         try {
           final errorResponse = json.decode(response.body);
-          errorMessage = errorResponse['message'] ?? 'Failed to fetch revenue summary data';
+          errorMessage = errorResponse['message'] ??
+              'Failed to fetch revenue summary data';
         } catch (e) {
-          errorMessage = 'Failed to fetch revenue summary data (Status: ${response.statusCode})';
+          errorMessage =
+              'Failed to fetch revenue summary data (Status: ${response.statusCode})';
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -650,7 +677,8 @@ class DashboardService extends GetxService {
       print('SocketException: ${e.toString()}');
       return {
         'success': false,
-        'message': 'Connection failed. Please check your internet connection and server status.',
+        'message':
+            'Connection failed. Please check your internet connection and server status.',
         'error_type': 'connection_error',
       };
     } on TimeoutException catch (e) {
@@ -678,37 +706,47 @@ class DashboardService extends GetxService {
   }
 
   /// Convenience method to get current year revenue summary
-  Future<Map<String, dynamic>> getCurrentYearRevenueSummary({String? merchantId}) async {
-    return await getRevenueSummaryByPeriod('current_year', merchantId: merchantId);
+  Future<Map<String, dynamic>> getCurrentYearRevenueSummary(
+      {String? merchantId}) async {
+    return await getRevenueSummaryByPeriod('current_year',
+        merchantId: merchantId);
   }
 
   /// Convenience method to get current month revenue summary
-  Future<Map<String, dynamic>> getCurrentMonthRevenueSummary({String? merchantId}) async {
-    return await getRevenueSummaryByPeriod('current_month', merchantId: merchantId);
+  Future<Map<String, dynamic>> getCurrentMonthRevenueSummary(
+      {String? merchantId}) async {
+    return await getRevenueSummaryByPeriod('current_month',
+        merchantId: merchantId);
   }
 
   /// Convenience method to get last year revenue summary
-  Future<Map<String, dynamic>> getLastYearRevenueSummary({String? merchantId}) async {
+  Future<Map<String, dynamic>> getLastYearRevenueSummary(
+      {String? merchantId}) async {
     return await getRevenueSummaryByPeriod('last_year', merchantId: merchantId);
   }
 
   /// Convenience method to get last month revenue summary
-  Future<Map<String, dynamic>> getLastMonthRevenueSummary({String? merchantId}) async {
-    return await getRevenueSummaryByPeriod('last_month', merchantId: merchantId);
+  Future<Map<String, dynamic>> getLastMonthRevenueSummary(
+      {String? merchantId}) async {
+    return await getRevenueSummaryByPeriod('last_month',
+        merchantId: merchantId);
   }
 
   /// Convenience method to get all time revenue summary
-  Future<Map<String, dynamic>> getAllTimeRevenueSummary({String? merchantId}) async {
+  Future<Map<String, dynamic>> getAllTimeRevenueSummary(
+      {String? merchantId}) async {
     return await getRevenueSummaryByPeriod('all_time', merchantId: merchantId);
   }
 
   /// Get revenue dashboard overview data for main dashboard screen
   /// This combines the most important revenue stats in a single call
-  Future<Map<String, dynamic>> getRevenueDashboardOverview({String? merchantId}) async {
+  Future<Map<String, dynamic>> getRevenueDashboardOverview(
+      {String? merchantId}) async {
     try {
       // Get dashboard stats which includes time periods and breakdowns
-      final dashboardResult = await getRevenueDashboardStats(merchantId: merchantId);
-      
+      final dashboardResult =
+          await getRevenueDashboardStats(merchantId: merchantId);
+
       if (!dashboardResult['success']) {
         return dashboardResult;
       }
@@ -720,13 +758,16 @@ class DashboardService extends GetxService {
           'message': 'Dashboard data is null',
         };
       }
-      
+
       // Extract the most important data for overview with null safety
-      final timePeriods = dashboardData['time_periods'] as Map<String, dynamic>?;
+      final timePeriods =
+          dashboardData['time_periods'] as Map<String, dynamic>?;
       final comparisons = dashboardData['comparisons'] as Map<String, dynamic>?;
-      final currentYearBreakdown = dashboardData['current_year_breakdown'] as Map<String, dynamic>?;
-      final recentActivity = dashboardData['recent_activity'] as Map<String, dynamic>?;
-      
+      final currentYearBreakdown =
+          dashboardData['current_year_breakdown'] as Map<String, dynamic>?;
+      final recentActivity =
+          dashboardData['recent_activity'] as Map<String, dynamic>?;
+
       return {
         'success': true,
         'data': {
@@ -760,11 +801,11 @@ class DashboardService extends GetxService {
   }) async {
     try {
       final futures = <Future<Map<String, dynamic>>>[];
-      
+
       // Always include revenue data
       futures.add(getRevenueDashboardStats(merchantId: merchantId));
       futures.add(getQuickRevenueStats(merchantId: merchantId));
-      
+
       // Add expenses data if requested
       if (includeExpenses) {
         final expensesService = DashboardService();
@@ -773,7 +814,7 @@ class DashboardService extends GetxService {
       }
 
       final results = await Future.wait(futures);
-      
+
       // Check if any request failed
       for (var result in results) {
         if (result['success'] != true) {
@@ -812,7 +853,7 @@ class DashboardService extends GetxService {
     String? merchantId,
   }) async {
     final DashboardService service = DashboardService();
-    
+
     try {
       final futures = await Future.wait([
         service.getRevenueDashboardStats(merchantId: merchantId),
@@ -827,7 +868,12 @@ class DashboardService extends GetxService {
       final currentMonthSummary = futures[3];
 
       // Check if any request failed with null safety
-      final results = [dashboardStats, quickStats, currentYearSummary, currentMonthSummary];
+      final results = [
+        dashboardStats,
+        quickStats,
+        currentYearSummary,
+        currentMonthSummary
+      ];
       for (var result in results) {
         if (result['success'] != true) {
           return result; // Return first error encountered
@@ -869,7 +915,8 @@ class DashboardService extends GetxService {
       final currentResult = futures[0];
       final comparisonResult = futures[1];
 
-      if (currentResult['success'] != true || comparisonResult['success'] != true) {
+      if (currentResult['success'] != true ||
+          comparisonResult['success'] != true) {
         return {
           'success': false,
           'message': 'Failed to fetch comparison data',
@@ -878,24 +925,28 @@ class DashboardService extends GetxService {
 
       final currentData = currentResult['data'] as Map<String, dynamic>?;
       final comparisonData = comparisonResult['data'] as Map<String, dynamic>?;
-      
+
       if (currentData == null || comparisonData == null) {
         return {
           'success': false,
           'message': 'Comparison data is null',
         };
       }
-      
+
       // Calculate percentage changes with null safety
       final currentMetrics = currentData['metrics'] as Map<String, dynamic>?;
-      final comparisonMetrics = comparisonData['metrics'] as Map<String, dynamic>?;
-      
-      final currentRevenue = (currentMetrics?['total_revenue'] as num?)?.toDouble() ?? 0.0;
-      final comparisonRevenue = (comparisonMetrics?['total_revenue'] as num?)?.toDouble() ?? 0.0;
-      
+      final comparisonMetrics =
+          comparisonData['metrics'] as Map<String, dynamic>?;
+
+      final currentRevenue =
+          (currentMetrics?['total_revenue'] as num?)?.toDouble() ?? 0.0;
+      final comparisonRevenue =
+          (comparisonMetrics?['total_revenue'] as num?)?.toDouble() ?? 0.0;
+
       double percentageChange = 0.0;
       if (comparisonRevenue > 0) {
-        percentageChange = ((currentRevenue - comparisonRevenue) / comparisonRevenue) * 100;
+        percentageChange =
+            ((currentRevenue - comparisonRevenue) / comparisonRevenue) * 100;
       } else if (currentRevenue > 0) {
         percentageChange = 100.0;
       }
@@ -908,7 +959,11 @@ class DashboardService extends GetxService {
           'comparison_metrics': {
             'revenue_change': currentRevenue - comparisonRevenue,
             'revenue_percentage_change': percentageChange,
-            'trend': percentageChange > 0 ? 'up' : percentageChange < 0 ? 'down' : 'stable',
+            'trend': percentageChange > 0
+                ? 'up'
+                : percentageChange < 0
+                    ? 'down'
+                    : 'stable',
           }
         },
         'message': 'Revenue comparison retrieved successfully',

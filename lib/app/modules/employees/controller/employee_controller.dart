@@ -1,5 +1,5 @@
-import 'package:farm_agrobot/app/routes/app_pages.dart';
 import 'package:get/get.dart';
+import '../../../routes/app_pages.dart';
 
 class EmployeeController extends GetxController {
   // Observable variable for selected bottom navigation index

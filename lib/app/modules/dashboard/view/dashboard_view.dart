@@ -5,51 +5,69 @@ import '../../../global_widgets/menu_app_bar/menu_app_bar.dart';
 import '../../../global_widgets/drawer/views/drawer.dart';
 import '../../../global_widgets/bottom_navigation/bottom_navigation_widget.dart';
 import '../controller/dashboard_controller.dart';
+import '../controller/yield_dashboard_controller.dart';
 
-class DashboardScreen extends GetView<DashboardController> {
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
+    // Initialize both controllers
+    final dashboardController = Get.put(DashboardController());
+    final cropController = Get.put(CropYieldController());
+
     return Scaffold(
       appBar: MenuAppBar(
         title: 'Dashboard',
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
-            onPressed: controller.refreshDashboard,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              dashboardController.refreshDashboard();
+              cropController.refreshCropDashboard();
+            },
             tooltip: 'Refresh Dashboard',
           ),
         ],
       ),
       extendBodyBehindAppBar: false,
-      endDrawer: MyDrawer(),
-      body: Obx(() => controller.isLoading.value
-          ? _buildLoadingState()
-          : RefreshIndicator(
-              onRefresh: () async => controller.refreshDashboard(),
-              child: SingleChildScrollView(
-                physics: AlwaysScrollableScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWelcomeSection(),
-                      SizedBox(height: 20),
-                      _buildPeriodSelector(),
-                      SizedBox(height: 20),
-                      _buildMetricCards(),
-                      SizedBox(height: 20),
-                      _buildCropYieldSection(),
-                      SizedBox(height: 20),
-                      _buildQuickActions(),
-                    ],
-                  ),
-                ),
-              ),
-            )),
+      endDrawer: const MyDrawer(),
+      body: Obx(() {
+        bool isLoading = dashboardController.isLoading.value ||
+            cropController.isLoading.value;
+        bool hasError =
+            dashboardController.hasError.value || cropController.hasError.value;
+
+        if (isLoading) {
+          return _buildLoadingState();
+        }
+
+        if (hasError) {
+          return _buildErrorState(dashboardController, cropController);
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            await Future.wait([
+              dashboardController.loadDashboardData(),
+              cropController.loadCropDashboardData(),
+            ]);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                _buildHeaderSection(dashboardController),
+                const SizedBox(height: 12),
+                _buildMainContent(dashboardController, cropController),
+              ],
+            ),
+          ),
+        );
+      }),
       bottomNavigationBar: Obx(() => MyBottomNavigation(
-            selectedIndex: controller.selectedIndex.value,
-            onTabSelected: controller.onTabSelected,
+            selectedIndex: dashboardController.selectedIndex.value,
+            onTabSelected: dashboardController.onTabSelected,
           )),
     );
   }
@@ -60,275 +78,303 @@ class DashboardScreen extends GetView<DashboardController> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(color: kPrimaryColor),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Loading dashboard...',
-            style: TextStyle(
-              color: kSecondaryColor,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: kSecondaryColor, fontSize: 16),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWelcomeSection() {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [kPrimaryColor, kSecondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _buildErrorState(DashboardController dashboardController,
+      CropYieldController cropController) {
+    String errorMsg = dashboardController.hasError.value
+        ? dashboardController.errorMessage.value
+        : cropController.errorMessage.value;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: kRed),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to Load Data',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: kBlackColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMsg,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                dashboardController.refreshDashboard();
+                cropController.refreshCropDashboard();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+                foregroundColor: kLightColor,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: kPrimaryColor.withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _buildHeaderSection(DashboardController controller) {
+    return Container(
+      color: kLightColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Welcome Back!',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Here\'s your farm\'s overview',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 16,
-                  ),
-                ),
+                Obx(() {
+                  String periodText = '';
+                  switch (controller.selectedPeriod.value) {
+                    case 'week':
+                      periodText = 'Weekly';
+                      break;
+                    case 'month':
+                      periodText = 'Monthly';
+                      break;
+                    case 'year':
+                      periodText = 'Yearly';
+                      break;
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Financial Report',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        periodText,
+                        style: const TextStyle(
+                          color: kPrimaryColor,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                _buildPeriodToggle(controller),
               ],
             ),
-          ),
-          Icon(
-            Icons.agriculture,
-            size: 60,
-            color: Colors.white.withOpacity(0.7),
-          ),
-        ],
+            const SizedBox(height: 12),
+            _buildFinancialOverview(controller),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildPeriodSelector() {
+  Widget _buildPeriodToggle(DashboardController controller) {
     return Container(
-      height: 45,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: kLightGreen.withOpacity(0.3),
+        color: kPrimaryColor,
         borderRadius: BorderRadius.circular(25),
       ),
       child: Row(
         children: [
-          _buildPeriodButton('Week', 'week'),
-          _buildPeriodButton('Month', 'month'),
-          _buildPeriodButton('Year', 'year'),
+          _buildToggleButton('W', 'week', controller),
+          _buildToggleButton('M', 'month', controller),
+          _buildToggleButton('Y', 'year', controller),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodButton(String label, String period) {
-    return Expanded(
-      child: Obx(() => GestureDetector(
-            onTap: () => controller.changePeriod(period),
-            child: Container(
-              margin: EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: controller.selectedPeriod.value == period
-                    ? kPrimaryColor
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Center(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: controller.selectedPeriod.value == period
-                        ? Colors.white
-                        : kSecondaryColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          )),
-    );
-  }
-
-  Widget _buildMetricCards() {
+  Widget _buildToggleButton(
+      String label, String period, DashboardController controller) {
     return Obx(() {
-      double revenue, expenses;
-      String period = controller.selectedPeriod.value;
-
-      switch (period) {
-        case 'week':
-          revenue = controller.weeklyRevenue.value;
-          expenses = controller.weeklyExpenses.value;
-          break;
-        case 'month':
-          revenue = controller.monthlyRevenue.value;
-          expenses = controller.monthlyExpenses.value;
-          break;
-        case 'year':
-        default:
-          revenue = controller.totalRevenue.value;
-          expenses = controller.totalExpenses.value;
-      }
-
-      double profit = revenue - expenses;
-
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildMetricCard(
-                  'Revenue',
-                  controller.formatCurrency(revenue),
-                  Icons.trending_up,
-                  kPrimaryColor,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _buildMetricCard(
-                  'Expenses',
-                  controller.formatCurrency(expenses),
-                  Icons.trending_down,
-                  Color(0xFFF44336),
-                ),
-              ),
-            ],
+      bool isSelected = controller.selectedPeriod.value == period;
+      return GestureDetector(
+        onTap: () => controller.changePeriod(period),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? kLightColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
           ),
-          SizedBox(height: 12),
-          _buildProfitCard(profit),
-        ],
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isSelected ? kPrimaryColor : kLightColor,
+            ),
+          ),
+        ),
       );
     });
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              Spacer(),
-              Text(
-                'This ${controller.selectedPeriod.value}',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+  Widget _buildFinancialOverview(DashboardController controller) {
+    return Obx(() {
+      double revenue = controller.getCurrentPeriodRevenue();
+      double expenses = controller.getCurrentPeriodExpenses();
+      double profit = revenue - expenses;
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kLightGreen,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: profit >= 0
+                        ? kSecondaryColor.withOpacity(0.15)
+                        : kRed.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: profit >= 0 ? kSecondaryColor : kRed,
+                    size: 20,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profit >= 0 ? 'Net Profit' : 'Net Loss',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      controller.formatCurrency(profit.abs()),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: profit >= 0 ? kSecondaryColor : kRed,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatPill(
+                    'Revenue',
+                    controller.formatCurrency(revenue),
+                    kPrimaryColor,
+                    Icons.arrow_circle_up,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildStatPill(
+                    'Expenses',
+                    controller.formatCurrency(expenses),
+                    kRed,
+                    Icons.arrow_circle_down,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 
-  Widget _buildProfitCard(double profit) {
-    bool isPositive = profit >= 0;
+  Widget _buildStatPill(
+      String label, String value, Color color, IconData icon) {
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isPositive
-              ? [Color(0xFF4CAF50), Color(0xFF2E7D32)]
-              : [Color(0xFFF44336), Color(0xFFD32F2F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: (isPositive ? kPrimaryColor : Color(0xFFF44336))
-                .withOpacity(0.3),
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
       child: Row(
         children: [
-          Icon(
-            isPositive ? Icons.account_balance_wallet : Icons.warning,
-            color: Colors.white,
-            size: 24,
-          ),
-          SizedBox(width: 12),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isPositive ? 'Net Profit' : 'Net Loss',
+                  label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                    color: color,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 1),
                 Text(
-                  controller.formatCurrency(profit.abs()),
+                  value,
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: color,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -338,318 +384,492 @@ class DashboardScreen extends GetView<DashboardController> {
     );
   }
 
-  Widget _buildCropYieldSection() {
+  Widget _buildMainContent(DashboardController dashboardController,
+      CropYieldController cropController) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Column(
+        children: [
+          _buildYieldsSection(cropController),
+          const SizedBox(height: 12),
+          _buildSalesSection(cropController),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildYieldsSection(CropYieldController controller) {
     return Container(
-      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kLightColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withOpacity(0.08),
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.agriculture, color: kPrimaryColor),
-              SizedBox(width: 8),
-              Text(
-                'Crop Yields',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: kSecondaryColor,
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: kSecondaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child:
+                          const Icon(Icons.eco, color: kLightColor, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Crop Yields',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Spacer(),
-              _buildCropPeriodSelector(),
-            ],
+                _buildCropPeriodSelector(controller),
+              ],
+            ),
           ),
-          SizedBox(height: 20),
-          _buildCropList(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: _buildCropCards(controller),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCropPeriodSelector() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: kLightGreen.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Obx(() => DropdownButtonHideUnderline(
+  Widget _buildCropPeriodSelector(CropYieldController controller) {
+    return Obx(() => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: kLightGreen,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: controller.selectedCropPeriod.value,
-              items: [
-                DropdownMenuItem(value: 'current_week', child: Text('This Week')),
-                DropdownMenuItem(value: 'current_month', child: Text('This Month')),
-                DropdownMenuItem(value: 'last_month', child: Text('Last Month')),
-                DropdownMenuItem(value: 'current_year', child: Text('This Year')),
-                DropdownMenuItem(value: 'last_year', child: Text('Last Year')),
+              isDense: true,
+              items: const [
+                DropdownMenuItem(value: 'current_week', child: Text('Week')),
+                DropdownMenuItem(value: 'current_month', child: Text('Month')),
+                DropdownMenuItem(
+                    value: 'last_month', child: Text('Last Month')),
+                DropdownMenuItem(value: 'current_year', child: Text('Year')),
               ],
-              onChanged: controller.changeCropPeriod,
+              onChanged: (value) => controller.changeCropPeriod(value),
               style: TextStyle(
                 color: kPrimaryColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
-              icon: Icon(Icons.arrow_drop_down, color: kPrimaryColor, size: 20),
-              dropdownColor: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              icon: Icon(Icons.expand_more, color: kPrimaryColor, size: 16),
             ),
-          )),
-    );
-  }
-
-  // Horizontal carousel slider for crops
-  Widget _buildCropList() {
-    return Obx(() => Container(
-          height: 280, // Fixed height for the carousel
-          child: PageView.builder(
-            controller: PageController(viewportFraction: 0.85),
-            itemCount: controller.cropYieldData.length,
-            itemBuilder: (context, index) {
-              var crop = controller.cropYieldData[index];
-              return Container(
-                margin: EdgeInsets.only(
-                  right: index == controller.cropYieldData.length - 1 ? 0 : 12,
-                  left: index == 0 ? 0 : 6,
-                ),
-                child: _buildCropYieldCard(crop),
-              );
-            },
           ),
         ));
   }
 
-  // Card design matching the image style
-  Widget _buildCropYieldCard(Map<String, dynamic> crop) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Color(0xFFF0F8E8), // Light green background like in image
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
+  Widget _buildCropCards(CropYieldController controller) {
+    return Obx(() {
+      if (controller.cropYieldData.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.all(30),
+          child: Center(
+            child: Column(
+              children: [
+                Icon(Icons.agriculture, size: 40, color: Colors.grey[300]),
+                const SizedBox(height: 8),
+                Text(
+                  'No crop data available',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
+        );
+      }
+
+      return SizedBox(
+        height: 130,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: controller.cropYieldData.length,
+          itemBuilder: (context, index) {
+            var crop = controller.cropYieldData[index];
+            return Padding(
+              padding: EdgeInsets.only(
+                  right: index == controller.cropYieldData.length - 1 ? 0 : 10),
+              child: _buildCropCard(crop, controller),
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildCropCard(
+      Map<String, dynamic> crop, CropYieldController controller) {
+    return Obx(() {
+      final yields = crop['yields'];
+      double currentYield = 0.0;
+
+      if (yields != null && yields is Map) {
+        final value = yields[controller.selectedCropPeriod.value];
+        currentYield = controller.getCurrentYieldForPeriod(
+          Map<String, dynamic>.from(yields),
+          controller.selectedCropPeriod.value,
+        );
+      }
+
+      // Get crop image
+      String? cropImage = crop['crop_image'] as String?;
+
+      // Get units for display
+      final units = crop['units'];
+      String displayUnit = 'kg';
+      if (units != null && units is Map && units.isNotEmpty) {
+        displayUnit = units.keys.first.toString();
+      }
+
+      return Container(
+        width: 120,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kLightYellow,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: kSecondaryColor.withOpacity(0.3), width: 1.5),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Crop Image/Icon
             Container(
-              width: 60,
-              height: 60,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
+                color: kLightColor,
+                shape: BoxShape.circle,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: crop['imagePath'] != null
-                    ? Image.asset(
-                        crop['imagePath'],
+              child: ClipOval(
+                child: cropImage != null && cropImage.isNotEmpty
+                    ? Image.network(
+                        cropImage,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Icon(
-                            Icons.agriculture,
-                            color: Color(crop['primaryColor'] ?? 0xFF4CAF50),
-                            size: 32,
+                            Icons.spa,
+                            color: kSecondaryColor,
+                            size: 22,
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                              strokeWidth: 2,
+                            ),
                           );
                         },
                       )
                     : Icon(
-                        Icons.agriculture,
-                        color: Color(crop['primaryColor'] ?? 0xFF4CAF50),
-                        size: 32,
+                        Icons.spa,
+                        color: kSecondaryColor,
+                        size: 22,
                       ),
               ),
             ),
-            SizedBox(height: 12),
-
-            // Crop Name
-            Text(
-              crop['name'] ?? 'Unknown Crop',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: kSecondaryColor,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            SizedBox(height: 12),
-
-            // Time periods and values
-            Expanded(
-              child: Column(
-                children: [
-                  _buildPeriodRow('This Week', _getCropYieldForPeriod(crop, 'current_week'), crop['unit'] ?? 'kg'),
-                  SizedBox(height: 6),
-                  _buildPeriodRow('This Month', _getCropYieldForPeriod(crop, 'current_month'), crop['unit'] ?? 'kg'),
-                  SizedBox(height: 6),
-                  _buildPeriodRow('Last Month', _getCropYieldForPeriod(crop, 'last_month'), crop['unit'] ?? 'kg'),
-                  SizedBox(height: 6),
-                  _buildPeriodRow('This Year', _getCropYieldForPeriod(crop, 'current_year'), crop['unit'] ?? 'kg'),
-                ],
-              ),
+            Column(
+              children: [
+                Text(
+                  crop['crop_name'] ?? 'Unknown',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: -0.2,
+                    color: kBlackColor,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${currentYield.toStringAsFixed(0)} ',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: kPrimaryColor,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      TextSpan(
+                        text: displayUnit,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
-  Widget _buildPeriodRow(String period, double value, String unit) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            period,
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF8BC34A), // Green color like in image
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Text(
-          value > 0 ? '${value.toStringAsFixed(0)} $unit' : '0 $unit',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[700],
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  double _getCropYieldForPeriod(Map<String, dynamic> crop, String period) {
-    // This method should get yield data for specific periods
-    // You'll need to implement this based on your controller's data structure
-    if (crop['yields'] != null && crop['yields'][period] != null) {
-      return crop['yields'][period].toDouble();
-    }
-    return 0.0;
-  }
-
-  Widget _buildQuickActions() {
+  Widget _buildSalesSection(CropYieldController controller) {
     return Container(
-      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: kLightGreen.withOpacity(0.1),
+        color: kLightColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kPrimaryColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: kSecondaryColor,
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.shopping_bag,
+                      color: kLightColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Obx(() {
+                  double totalYield = controller.getTotalYieldForPeriod();
+                  int totalRecords = controller.getTotalYieldRecords();
+
+                  return Row(
+                    children: [
+                      const Text(
+                        'Crop Summary',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kLightGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$totalRecords harvests',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: kPrimaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
             ),
           ),
-          SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  'Add Sale',
-                  Icons.add_shopping_cart,
-                  kPrimaryColor,
-                  () => Get.toNamed('/sales/add'),
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  'Add Expense',
-                  Icons.receipt_long,
-                  Color(0xFFF44336),
-                  () => Get.toNamed('/expenses/add'),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  'View Reports',
-                  Icons.analytics,
-                  Color(0xFF2196F3),
-                  () => Get.toNamed('/reports'),
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  'Crop Manager',
-                  Icons.eco,
-                  Color(0xFF4CAF50),
-                  () => Get.toNamed('/crops'),
-                ),
-              ),
-            ],
-          ),
+          Obx(() => _buildDynamicSalesItems(controller)),
+          const SizedBox(height: 6),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton(String label, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
+  Widget _buildDynamicSalesItems(CropYieldController controller) {
+    if (controller.cropYieldData.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(30),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.shopping_cart_outlined,
+                  size: 40, color: Colors.grey[300]),
+              const SizedBox(height: 8),
+              Text(
+                'No crop data available',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 22),
-            SizedBox(height: 6),
-            Text(
-              label,
+      );
+    }
+
+    // Get top performing crops
+    final topCrops = controller.getTopPerformingCrops(limit: 3);
+
+    List<Widget> salesItems = [];
+    for (int i = 0; i < topCrops.length; i++) {
+      var crop = topCrops[i];
+
+      // FIX: Don't cast - check type instead
+      final yields = crop['yields'];
+      double yieldAmount = 0.0;
+
+      if (yields != null && yields is Map) {
+        final value = yields[controller.selectedCropPeriod.value];
+        yieldAmount = controller.getCurrentYieldForPeriod(
+          Map<String, dynamic>.from(yields),
+          controller.selectedCropPeriod.value,
+        );
+      }
+
+      // FIX: Don't cast - check type instead
+      final units = crop['units'];
+      String displayUnit = 'kg';
+      if (units != null && units is Map && units.isNotEmpty) {
+        displayUnit = units.keys.first.toString();
+      }
+
+      // FIX: Safe integer conversion
+      int yieldCount = 0;
+      final yieldCountValue = crop['yield_count'];
+      if (yieldCountValue != null) {
+        if (yieldCountValue is int) {
+          yieldCount = yieldCountValue;
+        } else if (yieldCountValue is num) {
+          yieldCount = yieldCountValue.toInt();
+        }
+      }
+
+      salesItems.add(
+        _buildSalesItem(
+          crop['crop_name']?.toString() ?? 'Unknown',
+          '${yieldAmount.toStringAsFixed(1)} $displayUnit',
+          '$yieldCount harvests',
+          _getCropIcon(crop['crop_name']?.toString()),
+          controller
+              .getCropDisplayColor(crop['crop_name']?.toString() ?? 'Unknown'),
+        ),
+      );
+
+      if (i < topCrops.length - 1) {
+        salesItems.add(_buildDivider());
+      }
+    }
+
+    return Column(children: salesItems);
+  }
+
+  IconData _getCropIcon(String? cropName) {
+    if (cropName == null) return Icons.spa;
+
+    String name = cropName.toLowerCase();
+    if (name.contains('rice')) return Icons.rice_bowl;
+    if (name.contains('wheat')) return Icons.eco_outlined;
+    if (name.contains('corn') || name.contains('maize')) return Icons.grass;
+    if (name.contains('banana')) return Icons.nature;
+    if (name.contains('lemon') || name.contains('citrus'))
+      return Icons.emoji_food_beverage;
+    if (name.contains('tomato')) return Icons.local_florist;
+    if (name.contains('potato')) return Icons.terrain;
+
+    return Icons.spa;
+  }
+
+  Widget _buildDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Divider(height: 1, color: kListGrey),
+    );
+  }
+
+  Widget _buildSalesItem(String name, String quantity, String subtitle,
+      IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: kBlackColor,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  quantity,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: kLightGreen,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              subtitle,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: color,
+                fontWeight: FontWeight.w800,
+                color: kPrimaryColor,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
