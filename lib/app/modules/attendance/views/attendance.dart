@@ -13,7 +13,7 @@ class AttendanceScreen extends GetView<AttendanceController> {
       appBar: MenuAppBar(
         // isCustomScreen: false,
         title: 'Attendance',
-        showAddIcon: true,
+        showAddIcon: false,
         onAddPressed: () {
           controller.navigateToAddExpenses();
         },

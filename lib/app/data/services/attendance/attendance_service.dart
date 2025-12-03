@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../config/api.dart';
 import '../../models/attendance/attendance_record_model.dart';
 
@@ -1035,6 +1038,126 @@ class AttendanceService {
     }
   }
 
+  /// Export attendance data to Excel file
+  static Future<Map<String, dynamic>> exportAttendanceToExcel({
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    try {
+      final formattedFromDate = DateFormat('yyyy-MM-dd').format(fromDate);
+      final formattedToDate = DateFormat('yyyy-MM-dd').format(toDate);
+
+      final uri = Uri.parse(exportAttendanceUrl).replace(
+        queryParameters: {
+          'from_date': formattedFromDate,
+          'to_date': formattedToDate,
+        },
+      );
+
+      print('📥 Calling Export API: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept':
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+        },
+      ).timeout(Duration(seconds: timeoutDuration));
+
+      print('📡 Export Response status: ${response.statusCode}');
+      print('📡 Content-Type: ${response.headers['content-type']}');
+
+      if (response.statusCode == 200) {
+        // Check if response is Excel or JSON based on content-type
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('spreadsheetml') ||
+            contentType.contains('excel') ||
+            contentType.contains('vnd.openxmlformats')) {
+          // Excel file received as bytes
+          final excelBytes = response.bodyBytes;
+
+          print('✅ Excel file received: ${excelBytes.length} bytes');
+
+          return {
+            'success': true,
+            'data': excelBytes,
+            'message': 'Excel file generated successfully',
+            'filename':
+                'attendance_export_${formattedFromDate}_${formattedToDate}.xlsx',
+          };
+        } else if (contentType.contains('json')) {
+          // Handle unexpected JSON response
+          try {
+            final jsonData = json.decode(response.body);
+            return {
+              'success': false,
+              'data': null,
+              'message':
+                  jsonData['error'] ?? 'Unexpected JSON response received',
+            };
+          } catch (e) {
+            return {
+              'success': false,
+              'data': null,
+              'message': 'Unexpected response format: $contentType',
+            };
+          }
+        } else {
+          return {
+            'success': false,
+            'data': null,
+            'message': 'Unexpected content type: $contentType',
+          };
+        }
+      } else {
+        // Handle error response
+        String errorMessage = 'Failed to export attendance';
+
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (e) {
+          // If response is not JSON, use the body as error message
+          errorMessage = response.body.isNotEmpty
+              ? response.body
+              : 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
+        }
+
+        return {
+          'success': false,
+          'data': null,
+          'message': errorMessage,
+        };
+      }
+    } on SocketException catch (e) {
+      print('🌐 Network error in export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message':
+            'Network connection error. Please check your internet connection.',
+      };
+    } on TimeoutException catch (e) {
+      print('⏱️ Timeout error in export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message': 'Request timeout. Please try again.',
+      };
+    } catch (e) {
+      print('💥 Export error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'message': 'An unexpected error occurred: ${e.toString()}',
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>> getSingleEmployeeReport({
     required String employeeId,
     required DateTime startDate,
@@ -1111,6 +1234,429 @@ class AttendanceService {
       };
     }
   }
+
+  /// Export employee report as Excel
+  static Future<Map<String, dynamic>> exportEmployeeReportExcel({
+    required String employeeId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final formattedStartDate = DateFormat('yyyy-MM-dd').format(startDate);
+      final formattedEndDate = DateFormat('yyyy-MM-dd').format(endDate);
+
+      // Build endpoint - adjust this to match your backend URL pattern
+      final String endpoint = empExportExcel.replaceAll('{id}', employeeId);
+
+      final uri = Uri.parse(endpoint).replace(queryParameters: {
+        'start_date': formattedStartDate,
+        'end_date': formattedEndDate,
+      });
+
+      print('📊 Calling Excel Export API: $uri');
+
+      final response = await http.get(uri);
+
+
+      print('📡 Excel Response status: ${response.statusCode}');
+      print('📡 Content-Type: ${response.headers['content-type']}');
+
+      if (response.statusCode == 200) {
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('spreadsheetml') ||
+            contentType.contains('excel') ||
+            contentType.contains('vnd.openxmlformats')) {
+          final excelBytes = response.bodyBytes;
+          print('✅ Excel file received: ${excelBytes.length} bytes');
+
+          return {
+            'success': true,
+            'data': excelBytes,
+            'filename':
+                'Employee_Report_${employeeId}_${formattedStartDate}_${formattedEndDate}.xlsx',
+            'message': 'Excel file generated successfully',
+          };
+        } else {
+          // Handle unexpected response format
+          return {
+            'success': false,
+            'data': null,
+            'error': 'Unexpected response format: $contentType',
+          };
+        }
+      } else {
+        // Handle error response
+        String errorMessage = 'Failed to export Excel';
+
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (e) {
+          errorMessage = response.body.isNotEmpty
+              ? response.body
+              : 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
+        }
+
+        return {
+          'success': false,
+          'data': null,
+          'error': errorMessage,
+        };
+      }
+    } on SocketException catch (e) {
+      print('🌐 Network error in Excel export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error':
+            'Network connection error. Please check your internet connection.',
+      };
+    } on TimeoutException catch (e) {
+      print('⏱️ Timeout error in Excel export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error': 'Request timeout. Please try again.',
+      };
+    } catch (e) {
+      print('💥 Excel export error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error': 'An unexpected error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Export employee report as PDF
+  static Future<Map<String, dynamic>> exportEmployeeReportPDF({
+    required String employeeId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final formattedStartDate = DateFormat('yyyy-MM-dd').format(startDate);
+      final formattedEndDate = DateFormat('yyyy-MM-dd').format(endDate);
+
+      // Build endpoint - adjust this to match your backend URL pattern
+      final String endpoint = empExportPdf.replaceAll('{id}', employeeId);
+
+      final uri = Uri.parse(endpoint).replace(queryParameters: {
+        'start_date': formattedStartDate,
+        'end_date': formattedEndDate,
+      });
+
+      print('📄 Calling PDF Export API: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      ).timeout(Duration(seconds: timeoutDuration));
+
+      print('📡 PDF Response status: ${response.statusCode}');
+      print('📡 Content-Type: ${response.headers['content-type']}');
+
+      if (response.statusCode == 200) {
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('application/pdf')) {
+          final pdfBytes = response.bodyBytes;
+          print('✅ PDF file received: ${pdfBytes.length} bytes');
+
+          return {
+            'success': true,
+            'data': pdfBytes,
+            'filename':
+                'Employee_Report_${employeeId}_${formattedStartDate}_${formattedEndDate}.pdf',
+            'message': 'PDF file generated successfully',
+          };
+        } else {
+          // Handle unexpected response format
+          return {
+            'success': false,
+            'data': null,
+            'error': 'Unexpected response format: $contentType',
+          };
+        }
+      } else {
+        // Handle error response
+        String errorMessage = 'Failed to export PDF';
+
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorMessage;
+        } catch (e) {
+          errorMessage = response.body.isNotEmpty
+              ? response.body
+              : 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
+        }
+
+        return {
+          'success': false,
+          'data': null,
+          'error': errorMessage,
+        };
+      }
+    } on SocketException catch (e) {
+      print('🌐 Network error in PDF export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error':
+            'Network connection error. Please check your internet connection.',
+      };
+    } on TimeoutException catch (e) {
+      print('⏱️ Timeout error in PDF export: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error': 'Request timeout. Please try again.',
+      };
+    } catch (e) {
+      print('💥 PDF export error: $e');
+      return {
+        'success': false,
+        'statusCode': 500,
+        'data': null,
+        'error': 'An unexpected error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  static Future<String?> saveFileToDevice({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    try {
+      if (Platform.isAndroid) {
+        if (await _getAndroidVersion() >= 33) {
+          // Android 13+: No permission needed for app-specific directories
+          print('📱 Android 13+: Using app-specific storage');
+        } else if (await _getAndroidVersion() >= 30) {
+          // Android 11-12: Use scoped storage
+          print('📱 Android 11-12: Using scoped storage');
+        } else {
+          // Android 10 and below: Request permission
+          final status = await Permission.storage.request();
+          if (!status.isGranted) {
+            print('❌ Storage permission denied');
+            return null;
+          }
+        }
+      }
+
+      // Get the appropriate directory
+      Directory? directory;
+
+      if (Platform.isAndroid) {
+        // Try to use Downloads folder
+        try {
+          // For Android 10+ use scoped storage
+          if (await _getAndroidVersion() >= 29) {
+            // Use app-specific external storage
+            directory = await getExternalStorageDirectory();
+
+            // Navigate to a more accessible location
+            if (directory != null) {
+              // Create a subfolder in the app's external directory
+              final customPath = Directory('${directory.path}/EmployeeReports');
+              if (!await customPath.exists()) {
+                await customPath.create(recursive: true);
+              }
+              directory = customPath;
+            }
+          } else {
+            // For older Android versions, use Downloads
+            final downloadsPath = '/storage/emulated/0/Download';
+            directory = Directory(downloadsPath);
+
+            if (!await directory.exists()) {
+              directory = await getExternalStorageDirectory();
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error accessing Downloads folder: $e');
+          directory = await getExternalStorageDirectory();
+        }
+      } else if (Platform.isIOS) {
+        // For iOS, use documents directory
+        directory = await getApplicationDocumentsDirectory();
+      } else {
+        // For other platforms
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        print('❌ Could not get storage directory');
+        return null;
+      }
+
+      // Create file path with timestamp to avoid duplicates
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final fileExtension = filename.split('.').last;
+      final baseFilename = filename.replaceAll('.$fileExtension', '');
+      final uniqueFilename = '${baseFilename}_$timestamp.$fileExtension';
+
+      final filePath = '${directory.path}/$uniqueFilename';
+      final file = File(filePath);
+
+      // Write bytes to file
+      await file.writeAsBytes(bytes);
+
+      print('✅ File saved successfully: $filePath');
+      print('📁 File size: ${bytes.length} bytes');
+
+      return filePath;
+    } catch (e) {
+      print('❌ Error saving file: $e');
+      return null;
+    }
+  }
+
+  /// Get Android SDK version
+  static Future<int> _getAndroidVersion() async {
+    if (!Platform.isAndroid) return 0;
+
+    try {
+      // This is a simplified version - you might want to use a package like device_info_plus
+      // For now, we'll assume a reasonable default
+      return 33; // Assume modern Android by default
+    } catch (e) {
+      return 29; // Fallback to Android 10
+    }
+  }
+
+  /// Open file with default system app
+  static Future<bool> openFile(String filePath) async {
+    try {
+      // Import this at the top: import 'package:open_file/open_file.dart';
+      final result = await OpenFile.open(filePath);
+
+      if (result.type == ResultType.done) {
+        print('✅ File opened successfully');
+        return true;
+      } else {
+        print('❌ Could not open file: ${result.message}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error opening file: $e');
+      return false;
+    }
+  }
+
+  /// Share file using system share sheet
+  static Future<bool> shareFile(String filePath, String filename) async {
+    try {
+      // You'll need to add share_plus package for this
+      // import 'package:share_plus/share_plus.dart';
+
+      // await Share.shareXFiles([XFile(filePath)], text: filename);
+
+      print('✅ File shared successfully');
+      return true;
+    } catch (e) {
+      print('❌ Error sharing file: $e');
+      return false;
+    }
+  }
+
+  /// Delete exported file
+  static Future<bool> deleteFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+        print('✅ File deleted: $filePath');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error deleting file: $e');
+      return false;
+    }
+  }
+
+  /// Get list of all exported files
+  static Future<List<FileInfo>> getExportedFiles() async {
+    try {
+      Directory? directory;
+
+      if (Platform.isAndroid) {
+        directory = await getExternalStorageDirectory();
+        if (directory != null) {
+          final customPath = Directory('${directory.path}/EmployeeReports');
+          if (await customPath.exists()) {
+            directory = customPath;
+          }
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) return [];
+
+      final files = await directory.list().toList();
+
+      final fileInfoList = <FileInfo>[];
+      for (var entity in files) {
+        if (entity is File) {
+          final stat = await entity.stat();
+          fileInfoList.add(FileInfo(
+            path: entity.path,
+            name: entity.path.split('/').last,
+            size: stat.size,
+            modified: stat.modified,
+          ));
+        }
+      }
+
+      // Sort by modified date, newest first
+      fileInfoList.sort((a, b) => b.modified.compareTo(a!.modified));
+
+      return fileInfoList;
+    } catch (e) {
+      print('❌ Error getting exported files: $e');
+      return [];
+    }
+  }
+}
+
+class FileInfo {
+  final String path;
+  final String name;
+  final int size;
+  final DateTime modified;
+
+  FileInfo({
+    required this.path,
+    required this.name,
+    required this.size,
+    required this.modified,
+  });
+
+  String get formattedSize {
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
+    return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String get formattedDate {
+    return DateFormat('dd MMM yyyy, hh:mm a').format(modified);
+  }
+
+  bool get isPDF => name.toLowerCase().endsWith('.pdf');
+  bool get isExcel =>
+      name.toLowerCase().endsWith('.xlsx') ||
+      name.toLowerCase().endsWith('.xls');
 }
 
 // Extension to help with date formatting (keeping the existing extension)

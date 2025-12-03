@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../config/api.dart';
 import '../../../core/values/app_colors.dart';
 import '../../../data/models/yield/yield_model.dart';
 import '../controller/view_yield_controller.dart';
@@ -95,12 +94,6 @@ class ViewYields extends StatelessWidget {
                   () => _showDateRangeFilter(),
                   isActive: controller.selectedStartDate.value != null ||
                       controller.selectedEndDate.value != null,
-                ),
-                _buildFilterPill(
-                  'With Bills',
-                  Icons.receipt_long,
-                  () => _showBillsFilter(),
-                  isActive: controller.filterHasBills.value != null,
                 ),
                 _buildFilterPill(
                   'Clear Filters',
@@ -242,21 +235,22 @@ class ViewYields extends StatelessWidget {
           child: RefreshIndicator(
             onRefresh: controller.refreshYields,
             child: ListView.builder(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: paginatedYields.length,
               itemBuilder: (context, index) {
                 final yield = paginatedYields[index];
                 final backgroundColor = backgroundColors[index % 2];
 
                 return Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  margin: EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: backgroundColor,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 1,
-                        blurRadius: 3,
+                        color: Colors.grey.withOpacity(0.06),
+                        spreadRadius: 0,
+                        blurRadius: 4,
                         offset: Offset(0, 1),
                       ),
                     ],
@@ -265,155 +259,223 @@ class ViewYields extends StatelessWidget {
                     onTap: () => _showYieldDetailsDialog(yield),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Row(
+                      padding: EdgeInsets.all(12),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Bill Images Preview
-                          _buildBillImagesPreview(yield),
-
-                          SizedBox(width: 16),
-
-                          // Yield Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Crop Name and Harvest Date
-                                Row(
+                          // Header Row - Crop Name and Menu
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Row(
                                   children: [
+                                    Icon(Icons.agriculture,
+                                        color: kPrimaryColor, size: 16),
+                                    SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         yield.cropName,
-                                        style: boldTextStyle.copyWith(
+                                        style: TextStyle(
                                           color: kPrimaryColor,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: kPrimaryColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        controller.formatHarvestDate(
-                                            yield.harvestDate),
-                                        style: textStyle.copyWith(
-                                          color: kPrimaryColor,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                SizedBox(height: 8),
-
-                                // Yield Variants Summary
-                                Text(
-                                  'Total: ${controller.getYieldVariantsSummary(yield)}',
-                                  style: textStyle.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-
-                                SizedBox(height: 4),
-
-                                // Farm Segments
-                                if (yield.yieldFarmSegments.isNotEmpty) ...[
-                                  Row(
-                                    children: [
-                                      Icon(Icons.location_on,
-                                          size: 14, color: Colors.grey[600]),
-                                      SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          '${yield.yieldFarmSegments.length} farm segment(s)',
-                                          style: textStyle.copyWith(
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 4),
-                                ],
-
-                                // Bills Status
-                                Row(
-                                  children: [
-                                    Icon(
-                                      controller.yieldHasBills(yield)
-                                          ? Icons.receipt_long
-                                          : Icons.receipt_long_outlined,
-                                      size: 14,
-                                      color: controller.yieldHasBills(yield)
-                                          ? Colors.green
-                                          : Colors.grey[400],
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      controller.yieldHasBills(yield)
-                                          ? '${controller.getBillCount(yield)} bill(s)'
-                                          : 'No bills',
-                                      style: textStyle.copyWith(
-                                        color: controller.yieldHasBills(yield)
-                                            ? Colors.green
-                                            : Colors.grey[600],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Actions Menu
-                          PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert, color: kSecondaryColor),
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.edit_outlined,
-                                        color: kSecondaryColor),
-                                    SizedBox(width: 8),
-                                    Text('Edit'),
                                   ],
                                 ),
                               ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.delete_outline,
-                                        color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text('Delete'),
+                              // Yield ID Badge
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: kPrimaryColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '#${yield.id}',
+                                  style: TextStyle(
+                                    color: kPrimaryColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              // Actions Menu
+                              PopupMenuButton<String>(
+                                icon: Icon(
+                                  Icons.more_vert,
+                                  color: kSecondaryColor,
+                                  size: 20,
+                                ),
+                                padding: EdgeInsets.zero,
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'view',
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.visibility_outlined,
+                                            color: kSecondaryColor, size: 18),
+                                        SizedBox(width: 12),
+                                        Text('View Details'),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.edit_outlined,
+                                            color: kSecondaryColor, size: 18),
+                                        SizedBox(width: 12),
+                                        Text('Edit'),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.delete_outline,
+                                            color: Colors.red, size: 18),
+                                        SizedBox(width: 12),
+                                        Text('Delete'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'view':
+                                      _showYieldDetailsDialog(yield);
+                                      break;
+                                    case 'edit':
+                                      controller.editYield(yield);
+                                      break;
+                                    case 'delete':
+                                      _showDeleteConfirmation(yield);
+                                      break;
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: 8),
+
+                          // Total Quantity, Date, and Bills Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Total Quantity Column
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total Quantity',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    SizedBox(height: 1),
+                                    Text(
+                                      controller.getYieldVariantsSummary(yield),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Bills Status Column
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Bills',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: controller.yieldHasBills(yield)
+                                            ? Colors.green.withOpacity(0.15)
+                                            : Colors.grey.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: controller.yieldHasBills(yield)
+                                              ? Colors.green.withOpacity(0.3)
+                                              : Colors.grey.withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        controller.yieldHasBills(yield)
+                                            ? '${controller.getBillCount(yield)} BILL${controller.getBillCount(yield) > 1 ? 'S' : ''}'
+                                            : 'NO BILLS',
+                                        style: TextStyle(
+                                          color: controller.yieldHasBills(yield)
+                                              ? Colors.green[700]
+                                              : Colors.grey[600],
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 8,
+                                          letterSpacing: 0.3,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Harvest Date Column
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Harvest Date',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    SizedBox(height: 1),
+                                    Text(
+                                      controller
+                                          .formatHarvestDate(yield.harvestDate),
+                                      style: TextStyle(
+                                        color: kSecondaryColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                      textAlign: TextAlign.end,
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
-                            onSelected: (value) {
-                              switch (value) {
-                                case 'view':
-                                  _showYieldDetailsDialog(yield);
-                                  break;
-                                case 'edit':
-                                  controller.editYield(yield);
-                                  break;
-                                case 'delete':
-                                  _showDeleteConfirmation(yield);
-                                  break;
-                              }
-                            },
                           ),
                         ],
                       ),
@@ -426,8 +488,14 @@ class ViewYields extends StatelessWidget {
         ),
 
         // Pagination Controls
-        Padding(
-          padding: EdgeInsets.all(16),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border(
+              top: BorderSide(color: Colors.grey[200]!, width: 1),
+            ),
+          ),
           child: Obx(() => _buildPaginationControls()),
         ),
       ],
@@ -1507,61 +1575,6 @@ class ViewYields extends StatelessWidget {
                 controller.selectedStartDate.value,
                 controller.selectedEndDate.value,
               );
-              Get.back();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryColor,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Apply'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBillsFilter() {
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Filter by Bills'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Obx(() => RadioListTile<bool?>(
-                  title: Text('All yields'),
-                  value: null,
-                  groupValue: controller.filterHasBills.value,
-                  onChanged: (value) {
-                    controller.filterHasBills.value = value;
-                  },
-                )),
-            Obx(() => RadioListTile<bool?>(
-                  title: Text('With bills only'),
-                  value: true,
-                  groupValue: controller.filterHasBills.value,
-                  onChanged: (value) {
-                    controller.filterHasBills.value = value;
-                  },
-                )),
-            Obx(() => RadioListTile<bool?>(
-                  title: Text('Without bills only'),
-                  value: false,
-                  groupValue: controller.filterHasBills.value,
-                  onChanged: (value) {
-                    controller.filterHasBills.value = value;
-                  },
-                )),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              controller.setBillsFilter(controller.filterHasBills.value);
               Get.back();
             },
             style: ElevatedButton.styleFrom(

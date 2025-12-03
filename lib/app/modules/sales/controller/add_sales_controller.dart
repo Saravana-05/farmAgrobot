@@ -24,7 +24,7 @@ class AddSaleController extends GetxController {
   final _saleDate = Rxn<DateTime>();
   final _totalAmount = 0.0.obs;
   final _merchants = <Merchant>[].obs;
-  final _availableYields = <AvailableYield>[].obs; // Changed to AvailableYield
+  final _availableYields = <AvailableYield>[].obs;
   final _paymentModes = <String>[].obs;
 
   // Error states
@@ -49,8 +49,7 @@ class AddSaleController extends GetxController {
   DateTime? get saleDate => _saleDate.value;
   double get totalAmount => _totalAmount.value;
   List<Merchant> get merchants => _merchants.toList();
-  List<AvailableYield> get availableYields =>
-      _availableYields.toList(); // Changed type
+  List<AvailableYield> get availableYields => _availableYields.toList();
   List<String> get paymentModes => _paymentModes.toList();
   String get merchantsError => _merchantsError.value;
   String get yieldsError => _yieldsError.value;
@@ -163,20 +162,17 @@ class AddSaleController extends GetxController {
         } else if (responseData is List) {
           modes = responseData.cast<String>();
         } else {
-          // Fallback to hardcoded payment modes if API response is unexpected
           modes = ['Cash', 'Card', 'UPI', 'Online'];
         }
 
         _paymentModes.value = modes;
         print('Payment modes loaded: ${_paymentModes.toList()}');
       } else {
-        // Use fallback payment modes matching your backend model choices
         _paymentModes.value = ['Cash', 'Card', 'UPI', 'Online'];
         print('Using fallback payment modes');
       }
     } catch (e) {
       print('Exception in loadPaymentModes: $e');
-      // Use fallback payment modes matching your backend model
       _paymentModes.value = ['Cash', 'Card', 'UPI', 'Online'];
     }
   }
@@ -192,7 +188,6 @@ class AddSaleController extends GetxController {
       print('Available yields API response: $result');
       print('Response type: ${result.runtimeType}');
 
-      // Check if response is HTML (error page)
       if (result['data'] is String &&
           result['data'].toString().startsWith('<!DOCTYPE')) {
         throw Exception('API returned HTML error page instead of JSON');
@@ -201,7 +196,6 @@ class AddSaleController extends GetxController {
       if (result['success'] == true && result['data'] != null) {
         final responseData = result['data'];
 
-        // Handle different response structures from your backend
         List<dynamic> yieldList = [];
 
         if (responseData is List) {
@@ -227,7 +221,6 @@ class AddSaleController extends GetxController {
             final yieldJson = yieldList[i];
             print('Parsing yield $i: $yieldJson');
 
-            // Create AvailableYield from backend response
             final availableYield = AvailableYield.fromJson(yieldJson);
             parsedYields.add(availableYield);
 
@@ -236,7 +229,6 @@ class AddSaleController extends GetxController {
             print('Error parsing yield at index $i: $e');
             print('Yield data: ${yieldList[i]}');
             print('Stack trace: $stackTrace');
-            // Continue with other yields even if one fails
           }
         }
 
@@ -247,7 +239,6 @@ class AddSaleController extends GetxController {
           _yieldsError.value = 'No available yields found';
         }
 
-        // Log summary for debugging
         _logYieldsSummary(parsedYields);
       } else {
         final errorMsg = result['message'] ??
@@ -286,7 +277,6 @@ class AddSaleController extends GetxController {
     print('==============================');
   }
 
-  // Refresh methods
   Future<void> refreshMerchants() async {
     await loadMerchants();
   }
@@ -311,6 +301,7 @@ class AddSaleController extends GetxController {
     if (picked != null) {
       _saleDate.value = picked;
       saleDateController.text = DateFormat('dd/MM/yyyy').format(picked);
+      print('Sale date selected: ${picked.toIso8601String()}');
     }
   }
 
@@ -343,7 +334,6 @@ class AddSaleController extends GetxController {
       _selectedYieldId.value = yieldId;
       print('Selected yield ID: $yieldId');
 
-      // Auto-populate some data based on selected yield
       final selectedYield =
           _availableYields.firstWhereOrNull((y) => y.id == yieldId);
       if (selectedYield != null) {
@@ -355,7 +345,6 @@ class AddSaleController extends GetxController {
     }
   }
 
-  // Image picker methods (keeping your existing implementation)
   Future<void> pickImageFromCamera() async {
     if (_billImages.length >= maxImages) {
       CustomSnackbar.showError(
@@ -543,7 +532,7 @@ class AddSaleController extends GetxController {
     }
   }
 
-  // Navigate to Review Sale Screen
+  // Navigate to Review Sale Screen - UPDATED to include sale_date
   void navigateToReviewSale() async {
     if (!_validateForm()) return;
 
@@ -551,9 +540,9 @@ class AddSaleController extends GetxController {
       final selectedYield = _availableYields
           .firstWhereOrNull((y) => y.id == _selectedYieldId.value);
 
-      // Prepare sale data for review screen
+      // Prepare sale data for review screen - INCLUDING sale_date
       Map<String, dynamic> saleData = {
-        'saleDate': _saleDate.value,
+        'saleDate': _saleDate.value, // This is the key field for sale_date
         'merchantId': _selectedMerchantId.value,
         'merchantName': selectedMerchantName,
         'totalAmount': _totalAmount.value,
@@ -567,7 +556,11 @@ class AddSaleController extends GetxController {
         'originalImages': _billImages,
       };
 
-      print('Navigating to review sale with data: $saleData');
+      print('Navigating to review sale with data:');
+      print('  Sale Date: ${_saleDate.value?.toIso8601String()}');
+      print('  Merchant: $selectedMerchantName');
+      print('  Total Amount: $_totalAmount');
+      print('  Payment Mode: ${_selectedPaymentMode.value}');
 
       // Navigate to review screen without saving to database
       Get.toNamed(Routes.SALES_REVIEW, arguments: saleData);
@@ -629,7 +622,6 @@ class AddSaleController extends GetxController {
       return false;
     }
 
-    // Validate selected yield still exists and is available
     final selectedYield = _availableYields
         .firstWhereOrNull((y) => y.id == _selectedYieldId.value);
     if (selectedYield == null) {
@@ -730,7 +722,6 @@ class AddSaleController extends GetxController {
     return yieldRecord?.cropName ?? '';
   }
 
-  // Get selected yield details for display
   AvailableYield? get selectedYield {
     if (_selectedYieldId.value.isEmpty) return null;
     return _availableYields
@@ -741,17 +732,20 @@ class AddSaleController extends GetxController {
     return '₹${_totalAmount.value.toStringAsFixed(2)}';
   }
 
+  String get formattedSaleDate {
+    if (_saleDate.value == null) return 'Not selected';
+    return DateFormat('dd/MM/yyyy').format(_saleDate.value!);
+  }
+
   String get imageSummary {
     if (_billImages.isEmpty) return 'No images selected';
     return '${_billImages.length} image${_billImages.length > 1 ? 's' : ''} selected';
   }
 
-  // Data validation helpers
   bool get hasMerchants => _merchants.isNotEmpty;
   bool get hasYields => _availableYields.isNotEmpty;
   bool get hasPaymentModes => _paymentModes.isNotEmpty;
 
-  // Get yields grouped by crop for better UI organization
   Map<String, List<AvailableYield>> get yieldsByCrop {
     final Map<String, List<AvailableYield>> grouped = {};
     for (final yield in _availableYields) {

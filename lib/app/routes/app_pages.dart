@@ -1,3 +1,4 @@
+import 'package:Farm_Agrobot/app/modules/yield/controller/yield_analytics_controller.dart';
 import 'package:get/get.dart';
 import '../modules/attendance/binding/employee_details_screen_binding.dart';
 import '../modules/attendance/views/attendance.dart';
@@ -31,9 +32,11 @@ import '../modules/merchants/views/add_merchant.dart';
 import '../modules/merchants/views/edit_merchant.dart';
 import '../modules/merchants/views/merchant_screen.dart';
 import '../modules/merchants/views/view_merchant.dart';
+import '../modules/sales/bindings/edit_sales_binding.dart';
 import '../modules/sales/bindings/sales_binding.dart';
 import '../modules/sales/controller/add_sales_controller.dart';
 import '../modules/sales/views/add_sales.dart';
+import '../modules/sales/views/edit_sales.dart';
 import '../modules/sales/views/sale_review_screen.dart';
 import '../modules/sales/views/sales_screen.dart';
 import '../modules/settings/views/settings_screen.dart';
@@ -44,6 +47,7 @@ import '../modules/wages/views/edit_wages.dart';
 import '../modules/wages/views/view_wages.dart';
 import '../modules/wages/views/wages_screen.dart';
 import '../modules/yield/views/add_yield.dart';
+import '../modules/yield/views/yield_analytics_screen.dart';
 import '../modules/yield/views/yield_edit.dart';
 import '../modules/yield/views/yield_screen.dart';
 
@@ -244,6 +248,11 @@ class AppPages {
       // binding: EditExpenseBinding(),
     ),
     GetPage(
+      name: _Paths.EDIT_SALES,
+      page: () => EditSale(),
+      binding: EditSaleBinding(),
+    ),
+    GetPage(
       name: _Paths.SALES_REVIEW,
       page: () => SaleReviewScreen(),
       // binding: EditExpenseBinding(),
@@ -252,6 +261,10 @@ class AppPages {
       name: _Paths.SETTINGS,
       page: () => SettingsScreen(),
       // binding: EditExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.YIELDANALYTICS,
+      page: () => YieldAnalyticsScreen(),
     ),
     GetPage(
       name: _Paths.EMPLOYEE_DETAILS,

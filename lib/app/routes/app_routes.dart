@@ -48,6 +48,7 @@ abstract class Routes {
   static const VIEW_SALES = _Paths.VIEW_SALES;
   static const EDIT_SALES = _Paths.EDIT_SALES;
   static const DASHBOARD = _Paths.DASHBOARD;
+  static const YIELDANALYTICS = _Paths.YIELDANALYTICS;
 
 }
 
@@ -99,4 +100,5 @@ abstract class _Paths {
   static const VIEW_SALES = '/view_sales';
   static const EDIT_SALES = '/edit_sales';
   static const DASHBOARD = '/dashboard';
+  static const YIELDANALYTICS = '/yield_analytics';
 }

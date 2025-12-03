@@ -2,6 +2,7 @@ class EmployeeAttendanceRecord {
   final String id;
   final String name;
   final String? tamilName;
+  final String? profileImageUrl;  
   final double dailyWage;
   final bool hasWage;
   final bool status;
@@ -10,6 +11,7 @@ class EmployeeAttendanceRecord {
     required this.id,
     required this.name,
     this.tamilName,
+    this.profileImageUrl,  
     required this.dailyWage,
     required this.hasWage,
     this.status = true,
@@ -20,6 +22,7 @@ class EmployeeAttendanceRecord {
       id: json['employee_id'].toString(),
       name: json['employee_name'] ?? '',
       tamilName: json['tamil_name'],
+      profileImageUrl: json['profile_image_url'],  
       dailyWage: (json['daily_wage'] ?? 0).toDouble(),
       hasWage: json['has_wage'] ?? false,
       status: json['status'] ?? true,
@@ -31,6 +34,7 @@ class EmployeeAttendanceRecord {
       'employee_id': id,
       'employee_name': name,
       'tamil_name': tamilName,
+      'profile_image_url': profileImageUrl,  
       'daily_wage': dailyWage,
       'has_wage': hasWage,
       'status': status,
@@ -238,7 +242,6 @@ class WeeklyData {
           .map((e) => {
                 'employee_id': e.employeeId,
                 'employee_name': e.employeeName,
-                
                 'daily_wage': e.dailyWage,
                 'attendance': e.attendance,
                 'present_days': e.presentDays,
@@ -786,4 +789,114 @@ class BulkPaymentInfo {
     required this.paymentReference,
     required this.totalAmount,
   });
+}
+
+class EmployeeReportData {
+  final String employeeId;
+  final String employeeName;
+  final double dailyWage;
+  final Map<String, dynamic>? periodSummary;
+  final List<AttendanceDay> dailyAttendance;
+  final List<WeeklyBreakdown> weeklyBreakdown;
+
+  EmployeeReportData({
+    required this.employeeId,
+    required this.employeeName,
+    required this.dailyWage,
+    this.periodSummary,
+    required this.dailyAttendance,
+    required this.weeklyBreakdown,
+  });
+}
+
+class AttendanceDay {
+  final String date;
+  final String dayName;
+  final String status;
+  final int? statusCode;
+  final double wageEarned;
+
+  AttendanceDay({
+    required this.date,
+    required this.dayName,
+    required this.status,
+    this.statusCode,
+    required this.wageEarned,
+  });
+
+  factory AttendanceDay.fromJson(Map<String, dynamic> json) {
+    return AttendanceDay(
+      date: json['date']?.toString() ?? '',
+      dayName: json['day_name']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'Not Marked',
+      statusCode: json['status_code'] is int
+          ? json['status_code']
+          : (json['status_code'] != null
+              ? int.tryParse(json['status_code'].toString())
+              : null),
+      wageEarned: _parseDoubleSafelyStatic(json['wage_earned']),
+    );
+  }
+
+  static double _parseDoubleSafelyStatic(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+}
+
+class WeeklyBreakdown {
+  final String weekStart;
+  final String weekEnd;
+  final int presentDays;
+  final int halfDays;
+  final int absentDays;
+  final double totalWagesEarned;
+  final double wagesPaid;
+  final double wagesPending;
+  final String paymentStatus;
+
+  WeeklyBreakdown({
+    required this.weekStart,
+    required this.weekEnd,
+    required this.presentDays,
+    required this.halfDays,
+    required this.absentDays,
+    required this.totalWagesEarned,
+    required this.wagesPaid,
+    required this.wagesPending,
+    required this.paymentStatus,
+  });
+
+  factory WeeklyBreakdown.fromJson(Map<String, dynamic> json) {
+    return WeeklyBreakdown(
+      weekStart: json['week_start']?.toString() ?? '',
+      weekEnd: json['week_end']?.toString() ?? '',
+      presentDays: _parseIntSafelyStatic(json['present_days']),
+      halfDays: _parseIntSafelyStatic(json['half_days']),
+      absentDays: _parseIntSafelyStatic(json['absent_days']),
+      totalWagesEarned: _parseDoubleSafelyStatic(json['total_wages_earned']),
+      wagesPaid: _parseDoubleSafelyStatic(json['wages_paid']),
+      wagesPending: _parseDoubleSafelyStatic(json['wages_pending']),
+      paymentStatus: json['payment_status']?.toString() ?? 'pending',
+    );
+  }
+
+  static int _parseIntSafelyStatic(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static double _parseDoubleSafelyStatic(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
 }

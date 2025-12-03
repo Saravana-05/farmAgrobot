@@ -6,6 +6,7 @@ import '../../../data/models/attendance/attendance_record_model.dart';
 import '../../../routes/app_pages.dart';
 import '../controller/attendance_UI_controller.dart';
 import '../controller/employee_details_controller.dart';
+import 'advance_ui.dart';
 import 'emp_weekly_status_button.dart';
 
 class AttendanceUIScreen extends StatelessWidget {
@@ -23,6 +24,7 @@ class AttendanceUIScreen extends StatelessWidget {
                 children: [
                   _buildDateRangeExportWidget(controller),
                   _buildWeekNavigation(controller),
+                  const EmployeeAdvanceWidget(),
                   _buildWagesSummaryAndActions(controller),
                   _buildEmployeeOrderButton(controller),
                   _buildAttendanceTable(controller),
@@ -42,9 +44,29 @@ class AttendanceUIScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Title
               Row(
                 children: [
+                  Icon(Icons.file_download, color: kPrimaryColor, size: 16),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Export Attendance',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: kPrimaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Date pickers and export button
+              Row(
+                children: [
+                  // From Date
                   Expanded(
                     child: InkWell(
                       onTap: () => _selectDate(controller, true),
@@ -63,21 +85,29 @@ class AttendanceUIScreen extends StatelessWidget {
                                 size: 14, color: Colors.grey.shade700),
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Text(
-                                controller.fromDate.value != null
-                                    ? DateFormat('dd MMM yyyy')
-                                        .format(controller.fromDate.value!)
-                                    : 'From Date',
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Obx(() => Text(
+                                    controller.fromDate.value != null
+                                        ? DateFormat('dd MMM yyyy')
+                                            .format(controller.fromDate.value!)
+                                        : 'From Date',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: controller.fromDate.value != null
+                                          ? Colors.black87
+                                          : Colors.grey.shade600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 6),
+
+                  // To Date
                   Expanded(
                     child: InkWell(
                       onTap: () => _selectDate(controller, false),
@@ -96,67 +126,210 @@ class AttendanceUIScreen extends StatelessWidget {
                                 size: 14, color: Colors.grey.shade700),
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Text(
-                                controller.toDate.value != null
-                                    ? DateFormat('dd MMM yyyy')
-                                        .format(controller.toDate.value!)
-                                    : 'To Date',
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Obx(() => Text(
+                                    controller.toDate.value != null
+                                        ? DateFormat('dd MMM yyyy')
+                                            .format(controller.toDate.value!)
+                                        : 'To Date',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: controller.toDate.value != null
+                                          ? Colors.black87
+                                          : Colors.grey.shade600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 8),
+
+                  // Export Button
                   Tooltip(
                     message: 'Export to Excel',
-                    child: InkWell(
-                      onTap: (controller.fromDate.value != null &&
-                              controller.toDate.value != null &&
-                              !controller.isExporting.value)
-                          ? () => controller.exportAttendanceToExcel(
-                              controller.fromDate.value!,
-                              controller.toDate.value!)
-                          : null,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: (controller.fromDate.value != null &&
-                                  controller.toDate.value != null &&
-                                  !controller.isExporting.value)
-                              ? kPrimaryColor
-                              : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: controller.isExporting.value
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation(Colors.white),
+                    child: Obx(() {
+                      final canExport = controller.fromDate.value != null &&
+                          controller.toDate.value != null &&
+                          !controller.isExporting.value;
+
+                      return InkWell(
+                        onTap: canExport
+                            ? () => controller.exportAttendanceToExcel(
+                                controller.fromDate.value!,
+                                controller.toDate.value!)
+                            : null,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: canExport
+                                ? kPrimaryColor
+                                : Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: controller.isExporting.value
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation(Colors.white),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.file_download,
+                                  color: Colors.white,
+                                  size: 16,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.file_download,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                      ),
-                    ),
+                        ),
+                      );
+                    }),
                   ),
                 ],
+              ),
+
+              // Date range validation message
+              Obx(() {
+                if (controller.fromDate.value != null &&
+                    controller.toDate.value != null) {
+                  if (controller.fromDate.value!
+                      .isAfter(controller.toDate.value!)) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline,
+                              size: 14, color: Colors.red.shade700),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'From date must be before To date',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    final days = controller.toDate.value!
+                            .difference(controller.fromDate.value!)
+                            .inDays +
+                        1;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 14, color: Colors.blue.shade700),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Exporting $days day${days > 1 ? 's' : ''} of attendance data',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                }
+                return const SizedBox.shrink();
+              }),
+
+              // Quick date range buttons
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildQuickDateButton(
+                      controller,
+                      'This Week',
+                      () => _setDateRange(
+                        controller,
+                        DateTime.now().subtract(
+                            Duration(days: DateTime.now().weekday - 1)),
+                        DateTime.now(),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _buildQuickDateButton(
+                      controller,
+                      'Last Week',
+                      () {
+                        final lastWeekEnd = DateTime.now()
+                            .subtract(Duration(days: DateTime.now().weekday));
+                        final lastWeekStart =
+                            lastWeekEnd.subtract(const Duration(days: 6));
+                        _setDateRange(controller, lastWeekStart, lastWeekEnd);
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildQuickDateButton(
+                      controller,
+                      'This Month',
+                      () {
+                        final now = DateTime.now();
+                        _setDateRange(
+                            controller, DateTime(now.year, now.month, 1), now);
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildQuickDateButton(
+                      controller,
+                      'Last Month',
+                      () {
+                        final now = DateTime.now();
+                        final lastMonth = DateTime(now.year, now.month - 1, 1);
+                        final lastMonthEnd = DateTime(now.year, now.month, 0);
+                        _setDateRange(controller, lastMonth, lastMonthEnd);
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildQuickDateButton(
+    AttendanceUIController controller,
+    String label,
+    VoidCallback onPressed,
+  ) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        minimumSize: const Size(0, 28),
+        side: BorderSide(color: kPrimaryColor.withOpacity(0.5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 10, color: kPrimaryColor),
+      ),
+    );
+  }
+
+  void _setDateRange(
+      AttendanceUIController controller, DateTime from, DateTime to) {
+    controller.fromDate.value = from;
+    controller.toDate.value = to;
   }
 
   Future<void> _selectDate(
@@ -168,6 +341,16 @@ class AttendanceUIScreen extends StatelessWidget {
           : (controller.toDate.value ?? DateTime.now()),
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: kPrimaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {

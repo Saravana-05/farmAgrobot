@@ -41,7 +41,12 @@ class SettingsScreen extends GetView<SettingsController> {
           ListTile(
             leading: Icon(Icons.account_circle),
             title: Text('Profile'),
-            onTap: () => controller.navigateToProfile(),
+            onTap: () => controller.navigateToYieldAnalytics(),
+          ),
+          ListTile(
+            leading: Icon(Icons.crop),
+            title: Text('Yield Analytics'),
+            onTap: () => controller.navigateToYieldAnalytics(),
           ),
         ],
       ),

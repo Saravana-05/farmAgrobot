@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../core/values/app_colors.dart';
 
+import '../../../data/models/attendance/attendance_record_model.dart';
 import '../controller/employee_details_controller.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
@@ -13,110 +14,253 @@ class EmployeeDetailsScreen extends StatelessWidget {
     final controller = Get.put(EmployeeDetailsController());
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: Obx(() => Text(
-          controller.employeeData.value?.name ?? 'Employee Details',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        )),
-        backgroundColor: kPrimaryColor,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: controller.fetchEmployeeReport,
-          ),
-        ],
-      ),
-      body: Obx(() {
-        if (controller.isLoadingReport.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        return RefreshIndicator(
-          onRefresh: controller.fetchEmployeeReport,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                _buildEmployeeHeader(controller),
-                _buildDateRangeCard(controller),
-                _buildSummaryCards(controller),
-                _buildPaymentSection(controller),
-                _buildWeeklyBreakdown(controller),
-                _buildAttendanceCalendar(controller),
-              ],
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          title: Obx(() => Text(
+                controller.employeeData.value?.name ?? 'Employee Details',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              )),
+          backgroundColor: kPrimaryColor,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: controller.fetchEmployeeReport,
             ),
-          ),
-        );
-      }),
-    );
+          ],
+        ),
+        body: Obx(() {
+          if (controller.isLoadingReport.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return RefreshIndicator(
+            onRefresh: controller.fetchEmployeeReport,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildEmployeeHeader(controller),
+                  _buildDateRangeCard(controller),
+                  _buildSummaryCards(controller),
+                  _buildPaymentSection(controller),
+                  _buildWeeklyBreakdown(controller),
+                  _buildAttendanceCalendar(controller),
+                ],
+              ),
+            ),
+          );
+        }),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: controller.showExportOptionsDialog,
+          backgroundColor: kPrimaryColor,
+          icon: const Icon(Icons.file_download, color: Colors.white),
+          label: const Text('Export', style: TextStyle(color: Colors.white)),
+        ));
   }
 
   Widget _buildEmployeeHeader(EmployeeDetailsController controller) {
+    return Obx(() {
+      final employee = controller.employeeData.value;
+      final imageUrl = employee?.profileImageUrl;
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              kPrimaryColor,
+              kPrimaryColor.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimaryColor.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Profile Picture
+            Stack(
+              children: [
+                // Outer glow circle
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 52,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    child: _buildProfileImage(imageUrl, employee?.name ?? 'U'),
+                  ),
+                ),
+                // Online/Active indicator (optional)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Employee Name
+            Text(
+              employee?.name ?? 'Unknown Employee',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 12),
+
+            // Daily Wage Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.currency_rupee,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${employee?.dailyWage.toStringAsFixed(0) ?? '0'} / day',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildProfileImage(String? imageUrl, String employeeName) {
+    // If image URL exists and is not empty
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 48,
+        backgroundColor: Colors.white,
+        child: ClipOval(
+          child: Image.network(
+            imageUrl,
+            width: 96,
+            height: 96,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                      : null,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    kPrimaryColor.withOpacity(0.7),
+                  ),
+                  strokeWidth: 3,
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              // Show default avatar if image fails to load
+              return _buildDefaultAvatar(employeeName);
+            },
+          ),
+        ),
+      );
+    }
+
+    // Show default avatar if no image URL
+    return CircleAvatar(
+      radius: 48,
+      backgroundColor: Colors.white,
+      child: _buildDefaultAvatar(employeeName),
+    );
+  }
+
+  Widget _buildDefaultAvatar(String name) {
+    // Get first letter of name for avatar
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kPrimaryColor,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
+      width: 96,
+      height: 96,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            kPrimaryColor.withOpacity(0.7),
+            kPrimaryColor.withOpacity(0.5),
+          ],
         ),
       ),
-      child: Column(
-        children: [
-          // Profile Picture
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.white,
-              backgroundImage: null, // Add employee image if available
-              child: Icon(
-                Icons.person,
-                size: 60,
-                color: kPrimaryColor.withOpacity(0.7),
-              ),
-            ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
-          const SizedBox(height: 16),
-          
-          // Employee Name
-          Text(
-            controller.employeeData.value?.name ?? 'Unknown Employee',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          
-          // Daily Wage
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Daily Wage: ₹${controller.employeeData.value?.dailyWage.toStringAsFixed(0) ?? '0'}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -187,7 +331,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
           // Attendance Summary
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -260,7 +405,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _getPercentageColor(controller.attendancePercentage.value),
+                          color: _getPercentageColor(
+                              controller.attendancePercentage.value),
                         ),
                       ),
                     ],
@@ -270,7 +416,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                     value: controller.attendancePercentage.value / 100,
                     backgroundColor: Colors.grey.shade300,
                     valueColor: AlwaysStoppedAnimation(
-                      _getPercentageColor(controller.attendancePercentage.value),
+                      _getPercentageColor(
+                          controller.attendancePercentage.value),
                     ),
                     minHeight: 8,
                   ),
@@ -279,11 +426,12 @@ class EmployeeDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Wages Summary
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -298,11 +446,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildWageRow('Total Earned', controller.totalWagesEarned.value, Colors.blue),
+                  _buildWageRow('Total Earned',
+                      controller.totalWagesEarned.value, Colors.blue),
                   const SizedBox(height: 8),
-                  _buildWageRow('Amount Paid', controller.totalWagesPaid.value, Colors.green),
+                  _buildWageRow('Amount Paid', controller.totalWagesPaid.value,
+                      Colors.green),
                   const SizedBox(height: 8),
-                  _buildWageRow('Pending Amount', controller.totalWagesPending.value, Colors.red),
+                  _buildWageRow('Pending Amount',
+                      controller.totalWagesPending.value, Colors.red),
                   const SizedBox(height: 16),
                   // Payment Percentage
                   Row(
@@ -320,7 +471,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _getPercentageColor(controller.paymentPercentage.value),
+                          color: _getPercentageColor(
+                              controller.paymentPercentage.value),
                         ),
                       ),
                     ],
@@ -343,7 +495,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, Color color, IconData icon) {
+  Widget _buildSummaryItem(
+      String label, String value, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -405,13 +558,15 @@ class EmployeeDetailsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           color: Colors.green.shade50,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green.shade700, size: 30),
+                Icon(Icons.check_circle,
+                    color: Colors.green.shade700, size: 30),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
@@ -443,7 +598,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.account_balance_wallet, color: Colors.orange.shade700),
+                  Icon(Icons.account_balance_wallet,
+                      color: Colors.orange.shade700),
                   const SizedBox(width: 8),
                   Text(
                     'Pending Payment',
@@ -540,7 +696,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
   Widget _buildWeekCard(WeeklyBreakdown week) {
     final startDate = DateTime.tryParse(week.weekStart);
     final endDate = DateTime.tryParse(week.weekEnd);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -566,7 +722,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getPaymentStatusColor(week.paymentStatus).withOpacity(0.2),
+                  color: _getPaymentStatusColor(week.paymentStatus)
+                      .withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -584,13 +741,16 @@ class EmployeeDetailsScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _buildWeekStat('Present', week.presentDays.toString(), Colors.green),
+                child: _buildWeekStat(
+                    'Present', week.presentDays.toString(), Colors.green),
               ),
               Expanded(
-                child: _buildWeekStat('Half', week.halfDays.toString(), Colors.orange),
+                child: _buildWeekStat(
+                    'Half', week.halfDays.toString(), Colors.orange),
               ),
               Expanded(
-                child: _buildWeekStat('Absent', week.absentDays.toString(), Colors.red),
+                child: _buildWeekStat(
+                    'Absent', week.absentDays.toString(), Colors.red),
               ),
             ],
           ),
@@ -713,7 +873,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
   Widget _buildAttendanceGrid(EmployeeDetailsController controller) {
     // Group attendance data by month for better organization
     Map<String, List<AttendanceDay>> monthlyData = {};
-    
+
     for (var day in controller.dailyAttendanceData) {
       final date = DateTime.tryParse(day.date);
       if (date != null) {
@@ -766,17 +926,17 @@ class EmployeeDetailsScreen extends StatelessWidget {
   Widget _buildAttendanceDay(AttendanceDay day) {
     final date = DateTime.tryParse(day.date);
     final isToday = date != null && _isToday(date);
-    
+
     return Container(
       decoration: BoxDecoration(
-        color: isToday 
-          ? Colors.yellow.shade100
-          : _getAttendanceBackgroundColor(day.statusCode),
+        color: isToday
+            ? Colors.yellow.shade100
+            : _getAttendanceBackgroundColor(day.statusCode),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isToday 
-            ? Colors.orange 
-            : _getAttendanceBorderColor(day.statusCode),
+          color: isToday
+              ? Colors.orange
+              : _getAttendanceBorderColor(day.statusCode),
           width: isToday ? 2 : 1,
         ),
       ),
@@ -952,11 +1112,12 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   void _showFullPaymentDialog(EmployeeDetailsController controller) {
     final amount = controller.totalWagesPending.value;
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Full Payment'),
-        content: Text('Pay full pending amount of ₹${amount.toStringAsFixed(0)}?'),
+        content:
+            Text('Pay full pending amount of ₹${amount.toStringAsFixed(0)}?'),
         actions: [
           TextButton(
             onPressed: () => Get.back(),

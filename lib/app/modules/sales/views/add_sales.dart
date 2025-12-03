@@ -279,20 +279,7 @@ class AddSale extends GetView<AddSaleController> {
               }),
             ),
             const SizedBox(width: 10),
-            // Obx(() {
-            //   final maxReached = controller.maxImagesReached;
-            //   return ElevatedButton.icon(
-            //     onPressed:
-            //         maxReached ? null : () => controller.pickMultipleImages(),
-            //     icon: const Icon(Icons.photo_library),
-            //     label: const Text('Gallery'),
-            //     style: ElevatedButton.styleFrom(
-            //       backgroundColor: Colors.green,
-            //       foregroundColor: kLightColor,
-            //       padding: const EdgeInsets.symmetric(vertical: 12),
-            //     ),
-            //   );
-            // }),
+           
           ],
         ),
         const SizedBox(height: 15),

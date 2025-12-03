@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../../../config/api.dart';
 import '../../models/employee/emp_model.dart';
 
@@ -146,33 +147,45 @@ class EmployeeService {
   }
 
   /// Get employee details by ID
-  static Future<Map<String, dynamic>> getEmployeeDetail(
-      String employeeId) async {
-    try {
-      final uri = Uri.parse(editEmployeeUrl.replaceFirst('{id}', employeeId));
-
-      final response = await http.get(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      return {
-        'success': response.statusCode == 200,
-        'statusCode': response.statusCode,
-        'data': json.decode(response.body),
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'statusCode': 500,
-        'data': {
-          'status': 'error',
-          'message': 'Network error: ${e.toString()}'
-        },
-      };
+  /// Get employee detail with optional date parameter for historical wage lookup
+static Future<Map<String, dynamic>> getEmployeeDetail(
+  String employeeId, {
+  DateTime? targetDate,
+}) async {
+  try {
+    // Build the URL with optional date parameter
+    String url = editEmployeeUrl.replaceFirst('{id}', employeeId);
+    
+    // Add date query parameter if provided
+    if (targetDate != null) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(targetDate);
+      final uri = Uri.parse(url);
+      url = uri.replace(queryParameters: {'date': dateStr}).toString();
     }
-  }
+    
+    final uri = Uri.parse(url);
 
+    final response = await http.get(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    return {
+      'success': response.statusCode == 200,
+      'statusCode': response.statusCode,
+      'data': json.decode(response.body),
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'statusCode': 500,
+      'data': {
+        'status': 'error',
+        'message': 'Network error: ${e.toString()}'
+      },
+    };
+  }
+}
   /// Get employee statistics
   static Future<Map<String, dynamic>> getEmployeeStatistics() async {
     try {

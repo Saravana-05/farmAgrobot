@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -229,7 +230,7 @@ class ViewSalesController extends GetxController {
       isLoading.value = true;
 
       print(
-          'Loading sales - Page: ${currentPage.value}, Search: ${searchKeyword.value}');
+          '🔍 Loading sales - Page: ${currentPage.value}, Search: ${searchKeyword.value}');
 
       final response = await SalesService.getAllSales(
         merchantId: selectedMerchantId.value,
@@ -249,125 +250,112 @@ class ViewSalesController extends GetxController {
         pageSize: itemsPerPage,
       );
 
-      print('Sales API Response: $response');
+      print('📥 Sales API Response: $response');
 
       if (response['success'] == true) {
-        final data = response['data'];
-        print('Sales response data: $data');
+        final responseData =
+            response['data']; // This is the outer 'data' from Django
+        print('📦 Response data: $responseData');
 
-        if (data != null) {
-          List<dynamic> salesData = [];
+        if (responseData != null && responseData is Map) {
+          // CORRECTED: Access nested 'data' object from Django response
+          final nestedData =
+              responseData['data']; // This contains sales, count, etc.
 
-          // Handle different API response structures
-          if (data is List) {
-            salesData = data;
-            totalCount.value = salesData.length;
-            print('Sales data is List with ${salesData.length} items');
-          } else if (data is Map) {
-            if (data.containsKey('sales')) {
-              salesData = data['sales'] ?? [];
-            } else if (data.containsKey('results')) {
-              salesData = data['results'] ?? [];
-            } else if (data.containsKey('data')) {
-              if (data['data'] is List) {
-                salesData = data['data'];
-              } else {
-                salesData = [data['data']];
-              }
-            } else {
-              // Fallback - try to use the map data directly if it looks like sale data
-              if (data.containsKey('total_calculated_amount') ||
-                  data.containsKey('id')) {
-                salesData = [data];
-              }
-            }
+          if (nestedData != null && nestedData is Map) {
+            // Extract sales array from nested data
+            List<dynamic> salesData = nestedData['sales'] ?? [];
 
-            totalCount.value = data['count'] ??
-                data['total'] ??
-                data['total_count'] ??
+            print('🔍 Found ${salesData.length} sales in response');
+
+            // Extract pagination metadata from nested data
+            totalCount.value = nestedData['count'] ??
+                nestedData['total_count'] ??
                 salesData.length;
-            hasNext.value = data['has_next'] ?? false;
-            hasPrevious.value = data['has_previous'] ?? false;
-            totalPages.value = data['total_pages'] ??
+
+            totalPages.value = nestedData['total_pages'] ??
                 ((totalCount.value / itemsPerPage).ceil());
 
-            print(
-                'Sales data is Map - sales count: ${salesData.length}, total: ${totalCount.value}');
-          }
-
-          // Convert to SaleModel objects
-          List<SaleModel> sales = [];
-          for (var saleData in salesData) {
-            try {
-              if (saleData is Map<String, dynamic>) {
-                final saleModel = SaleModel.fromJson(saleData);
-                sales.add(saleModel);
-                print(
-                    'Parsed sale: ${saleModel.id} - ${saleModel.totalCalculatedAmount}');
-              } else {
-                print('Invalid sale data format: $saleData');
-              }
-            } catch (e) {
-              print('Error parsing sale: $e');
-              print('Sale data: $saleData');
+            // Ensure totalPages is at least 1
+            if (totalPages.value < 1) {
+              totalPages.value = 1;
             }
+
+            // Extract current page info
+            int currentPageFromApi =
+                nestedData['current_page'] ?? currentPage.value;
+
+            // Set pagination flags
+            hasNext.value = nestedData['has_next'] ?? false;
+            hasPrevious.value = nestedData['has_previous'] ?? false;
+
+            print('✅ Pagination Info:');
+            print('  - Current Page: $currentPageFromApi');
+            print('  - Total Pages: ${totalPages.value}');
+            print('  - Total Count: ${totalCount.value}');
+            print('  - Items Per Page: $itemsPerPage');
+            print('  - Has Next: ${hasNext.value}');
+            print('  - Has Previous: ${hasPrevious.value}');
+            print('  - Sales in current page: ${salesData.length}');
+
+            // Convert to SaleModel objects
+            List<SaleModel> sales = [];
+            for (var saleData in salesData) {
+              try {
+                if (saleData is Map<String, dynamic>) {
+                  final saleModel = SaleModel.fromJson(saleData);
+                  sales.add(saleModel);
+                  print(
+                      '✅ Parsed sale: ${saleModel.id} - ${saleModel.totalCalculatedAmount}');
+                }
+              } catch (e) {
+                print('❌ Error parsing sale: $e');
+                print('🔍 Problem sale data: $saleData');
+              }
+            }
+
+            // Update observable lists
+            filteredSales.value = sales;
+            allSales.value = sales;
+
+            print('✅ Final sales list count: ${filteredSales.length}');
+          } else {
+            print('❌ Nested data is null or not a Map');
+            _resetSalesData();
           }
-
-          // Apply search filter if needed
-          if (searchKeyword.value.isNotEmpty) {
-            sales = sales
-                .where((sale) =>
-                    sale.merchantName
-                        .toLowerCase()
-                        .contains(searchKeyword.value.toLowerCase()) ||
-                    sale.cropName
-                        .toLowerCase()
-                        .contains(searchKeyword.value.toLowerCase()) ||
-                    sale.id
-                        .toString()
-                        .contains(searchKeyword.value.toLowerCase()))
-                .toList();
-          }
-
-          filteredSales.value = sales;
-          allSales.value = sales;
-
-          print('Final sales list count: ${filteredSales.length}');
-
-          // Update pagination info if not already set
-          if (totalPages.value <= 1) {
-            totalPages.value = (totalCount.value / itemsPerPage).ceil();
-          }
-          hasPrevious.value = currentPage.value > 1;
-          hasNext.value = currentPage.value < totalPages.value;
         } else {
-          print('Sales response data is null');
-          filteredSales.value = [];
-          allSales.value = [];
-          totalCount.value = 0;
+          print('❌ Response data is null or not a Map');
+          _resetSalesData();
         }
       } else {
-        print('Sales API response not successful: $response');
+        print('❌ Sales API response not successful: $response');
         CustomSnackbar.showError(
           title: 'Error',
           message: response['data']?['message'] ?? 'Failed to load sales',
         );
-        filteredSales.value = [];
-        allSales.value = [];
-        totalCount.value = 0;
+        _resetSalesData();
       }
-    } catch (e) {
-      print('Error loading sales: $e');
+    } catch (e, stackTrace) {
+      print('❌ Error loading sales: $e');
+      print('📍 Stack trace: $stackTrace');
       CustomSnackbar.showError(
         title: 'Error',
         message: 'Error loading sales: ${e.toString()}',
       );
-      filteredSales.value = [];
-      allSales.value = [];
-      totalCount.value = 0;
+      _resetSalesData();
     } finally {
       isLoading.value = false;
     }
+  }
+
+// Helper method to reset sales data
+  void _resetSalesData() {
+    filteredSales.value = [];
+    allSales.value = [];
+    totalCount.value = 0;
+    totalPages.value = 1;
+    hasNext.value = false;
+    hasPrevious.value = false;
   }
 
   // Get sale images for a specific sale
@@ -425,7 +413,7 @@ class ViewSalesController extends GetxController {
   void runFilter(String keyword) {
     print('Running sale filter with keyword: $keyword');
     searchKeyword.value = keyword;
-    currentPage.value = 1;
+    currentPage.value = 1; // Reset to first page
     loadSales();
   }
 
@@ -842,65 +830,6 @@ class ViewSalesController extends GetxController {
     } catch (e) {
       print('Error getting all sales for export: $e');
       return [];
-    }
-  }
-
-  // Generate reports
-  Future<void> generateExcelReport() async {
-    try {
-      final response = await SalesService.generateExcelReport(
-        merchantId: selectedMerchantId.value,
-        yieldId: selectedYieldId.value,
-        paymentMode: selectedPaymentMode.value,
-        status: selectedStatus.value,
-        paymentStatus: selectedPaymentStatus.value,
-        startDate: selectedStartDate.value != null
-            ? SalesService.formatDateForApi(selectedStartDate.value!)
-            : null,
-        endDate: selectedEndDate.value != null
-            ? SalesService.formatDateForApi(selectedEndDate.value!)
-            : null,
-        minAmount: minAmount.value?.toString(),
-        maxAmount: maxAmount.value?.toString(),
-      );
-
-      if (response['success'] == true) {
-        CustomSnackbar.showSuccess(
-          title: 'Success',
-          message: 'Excel report generated successfully',
-        );
-        // Handle file download here
-      } else {
-        String errorMessage = 'Failed to generate Excel report';
-        if (response['data'] != null && response['data']['message'] != null) {
-          errorMessage = response['data']['message'];
-        }
-        CustomSnackbar.showError(title: 'Error', message: errorMessage);
-      }
-    } catch (e) {
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
-    }
-  }
-
-  Future<void> generatePdfBill(String saleId) async {
-    try {
-      final response = await SalesService.generatePdfBill(saleId);
-
-      if (response['success'] == true) {
-        CustomSnackbar.showSuccess(
-          title: 'Success',
-          message: 'PDF bill generated successfully',
-        );
-        // Handle file download here
-      } else {
-        String errorMessage = 'Failed to generate PDF bill';
-        if (response['data'] != null && response['data']['message'] != null) {
-          errorMessage = response['data']['message'];
-        }
-        CustomSnackbar.showError(title: 'Error', message: errorMessage);
-      }
-    } catch (e) {
-      CustomSnackbar.showError(title: 'Error', message: e.toString());
     }
   }
 }

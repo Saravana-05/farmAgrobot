@@ -904,6 +904,25 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
   Future<void> _submitSale() async {
     if (_isSubmitting || !variantPricingValid || cropVariants.isEmpty) return;
 
+    // Validation
+    if (saleData!['merchantId'] == null ||
+        saleData!['merchantId'].toString() == '0') {
+      CustomSnackbar.showError(
+        title: 'Validation Error',
+        message: 'Please select a valid merchant',
+      );
+      return;
+    }
+
+    if (saleData!['yieldId'] == null ||
+        saleData!['yieldId'].toString() == '0') {
+      CustomSnackbar.showError(
+        title: 'Validation Error',
+        message: 'Please select a valid yield record',
+      );
+      return;
+    }
+
     // Check finalAmount vs entered total
     if (finalAmount.toStringAsFixed(2) !=
         totalAmountFromAddSale.toStringAsFixed(2)) {
@@ -922,35 +941,40 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
     try {
       List<Map<String, dynamic>> variantData = cropVariants
           .map((variant) => {
-                'crop_variant_id': int.tryParse(variant.id) ?? 0,
+                'crop_variant_id': variant.id,
                 'quantity': variant.quantity,
-                'amount': variant
-                    .pricePerUnit, // This should be 'amount', not 'amount_per_unit'
+                'amount': variant.pricePerUnit,
                 'unit': variant.unit,
               })
           .toList();
 
+      // Parse dates safely
+      DateTime saleDate = saleData!['saleDate'] ?? DateTime.now();
+      DateTime harvestDate = saleData!['harvestDate'] ??
+          saleData!['yieldHarvestDate'] ??
+          DateTime.now();
+
+      // Format dates as YYYY-MM-DD (Django's expected format)
+      String formatDate(DateTime date) {
+        return date.toIso8601String().split('T')[0];
+      }
+
       Map<String, dynamic> finalSaleData = {
-        'merchant':
-            int.tryParse(saleData!['merchantId']?.toString() ?? '0') ?? 0,
-        'yield_record':
-            int.tryParse(saleData!['yieldId']?.toString() ?? '0') ?? 0,
-        'payment_mode':
-            saleData!['paymentMode'] ?? 'Cash', // Match your backend choices
-        'harvest_date': SalesService.formatDateForApi(
-            saleData!['harvestDate'] ??
-                saleData!['yieldHarvestDate'] ??
-                DateTime.now()),
+        'merchant': saleData!['merchantId'].toString(),
+        'yield_record': saleData!['yieldId'].toString(),
+        'payment_mode': saleData!['paymentMode'] ?? 'Cash',
+        'sale_date': formatDate(saleDate),
+        'harvest_date': formatDate(harvestDate),
         'total_amount': calculatedTotalFromVariants,
         'total_calculated_amount': calculatedTotalFromVariants,
         'commission': commission,
         'lorry_rent': lorryRent,
         'cooly_charges': coolyCharges,
         'paid_amount': 0.0,
-        'variants': variantData, // This is the key fix
+        'variants': variantData,
       };
 
-      // FIXED: Get the images properly
+      // Get the images properly
       List<File>? imageFiles;
       if (saleData!['billImages'] != null) {
         final billImages = saleData!['billImages'];
@@ -962,17 +986,45 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
       }
 
       print('=== Final Sale Submission Debug ===');
-      print('Final sale data: ${json.encode(finalSaleData)}');
-      print('Variants count: ${variantData.length}');
+      print(
+          'Merchant ID: ${finalSaleData['merchant']} (${finalSaleData['merchant'].runtimeType})');
+      print(
+          'Yield Record ID: ${finalSaleData['yield_record']} (${finalSaleData['yield_record'].runtimeType})');
+      print('Sale Date: ${finalSaleData['sale_date']}');
+      print('Harvest Date: ${finalSaleData['harvest_date']}');
+      print('Variants: ${json.encode(variantData)}');
+      print('Total Amount: ${finalSaleData['total_amount']}');
+      print('Calculated Amount: ${finalSaleData['total_calculated_amount']}');
       print('Images count: ${imageFiles?.length ?? 0}');
-      print('Images: $imageFiles');
+      print('Full payload: ${json.encode(finalSaleData)}');
       print('=== End Debug ===');
 
-      // Call the fixed service method
+      // Call the service method
       Map<String, dynamic> result = await SalesService.saveSale(
         saleData: finalSaleData,
-        saleImages: imageFiles, // Fixed: properly pass the image files
+        saleImages: imageFiles,
       );
+
+      // ===== DETAILED RESPONSE LOGGING =====
+      print('\n=== SERVER RESPONSE DEBUG ===');
+      print('Response success: ${result['success']}');
+      print('Response status code: ${result['statusCode'] ?? "N/A"}');
+      print('Full response data: ${json.encode(result)}');
+
+      if (result['data'] != null) {
+        print('Response data type: ${result['data'].runtimeType}');
+        print('Response data: ${json.encode(result['data'])}');
+      }
+
+      if (result['error'] != null) {
+        print('Response error: ${result['error']}');
+      }
+
+      if (result['data'] is Map && result['data']['errors'] != null) {
+        print('Validation errors: ${json.encode(result['data']['errors'])}');
+      }
+      print('=== END SERVER RESPONSE ===\n');
+      // ===== END RESPONSE LOGGING =====
 
       if (result['success']) {
         CustomSnackbar.showSuccess(
@@ -989,7 +1041,15 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
         if (result['data']['errors'] != null) {
           final errors = result['data']['errors'] as Map<String, dynamic>;
           if (errors.isNotEmpty) {
-            errorMessage = errors.values.first.toString();
+            List<String> errorMessages = [];
+            errors.forEach((key, value) {
+              if (value is List) {
+                errorMessages.add('$key: ${value.join(", ")}');
+              } else {
+                errorMessages.add('$key: $value');
+              }
+            });
+            errorMessage = errorMessages.join('\n');
             print('All validation errors: $errors');
           }
         }
@@ -999,8 +1059,13 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
           message: errorMessage,
         );
       }
-    } catch (e) {
-      print('Error submitting sale: $e');
+    } catch (e, stackTrace) {
+      print('\n=== EXCEPTION CAUGHT ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      print('Stack trace: $stackTrace');
+      print('=== END EXCEPTION ===\n');
+
       CustomSnackbar.showError(
         title: 'Error',
         message:

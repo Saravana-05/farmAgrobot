@@ -207,6 +207,13 @@ class Employee {
     return !status;
   }
 
+  String get displayName {
+  if (tamilName.isNotEmpty) {
+    return '$name ($tamilName)';
+  }
+  return name;
+}
+
   @override
   String toString() {
     return 'Employee{id: $id, name: $name, empType: $empType, status: $status}';

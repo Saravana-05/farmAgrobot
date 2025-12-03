@@ -5,151 +5,359 @@ import 'package:http/http.dart' as http;
 import '../../../config/api.dart';
 
 class SalesService {
-  /// Save sale data with variants and images
-  static Future<Map<String, dynamic>> saveSale({
-    required Map<String, dynamic> saleData,
-    List<File>? saleImages,
-  }) async {
-    try {
-      final uri = Uri.parse(saveSaleUrl);
-      http.Response response;
+ static Future<Map<String, dynamic>> saveSale({
+  required Map<String, dynamic> saleData,
+  List<File>? saleImages,
+}) async {
+  try {
+    final uri = Uri.parse(saveSaleUrl);
+    http.Response response;
 
-      // Validate sale data
-      final validationErrors = _validateSaleData(saleData);
-      if (validationErrors != null) {
+    print('\n=== SAVE SALE REQUEST DEBUG ===');
+    print('API URL: $uri');
+    print('Sale Data Keys: ${saleData.keys.toList()}');
+    print('Has Images: ${saleImages != null && saleImages.isNotEmpty}');
+    print('Image Count: ${saleImages?.length ?? 0}');
+
+    // Validate sale data
+    final validationErrors = _validateSaleData(saleData);
+    if (validationErrors != null) {
+      print('Client Validation Failed: $validationErrors');
+      return {
+        'success': false,
+        'statusCode': 400,
+        'data': {
+          'status': 'error',
+          'message': 'Validation failed',
+          'errors': validationErrors,
+        }
+      };
+    }
+
+    // Check if we have images to upload
+    if (saleImages != null && saleImages.isNotEmpty) {
+      // Validate images
+      final imageErrors = _validateImageFiles(saleImages);
+      if (imageErrors != null) {
+        print('Image Validation Failed: $imageErrors');
         return {
           'success': false,
           'statusCode': 400,
           'data': {
             'status': 'error',
-            'message': 'Validation failed',
-            'errors': validationErrors,
+            'message': 'Image validation failed',
+            'errors': imageErrors,
           }
         };
       }
 
-      // Check if we have images to upload
-      if (saleImages != null && saleImages.isNotEmpty) {
-        // Validate images
-        final imageErrors = _validateImageFiles(saleImages);
-        if (imageErrors != null) {
-          return {
-            'success': false,
-            'statusCode': 400,
-            'data': {
-              'status': 'error',
-              'message': 'Image validation failed',
-              'errors': imageErrors,
-            }
-          };
-        }
+      // Use multipart request for images
+      var request = http.MultipartRequest('POST', uri);
 
-        // FIXED: Use multipart request for multiple images
-        var request = http.MultipartRequest('POST', uri);
+      // CRITICAL: Extract variants before adding other fields
+      final variants = saleData['variants'];
 
-        // FIXED: Store variants separately before processing other fields
-        final variants = saleData['variants'];
+      print('\n--- Adding Form Fields ---');
 
-        // Add all non-array fields as regular form fields
-        saleData.forEach((key, value) {
-          if (value != null && key != 'variants') {
+      // Add all non-array fields as regular form fields
+      // FIXED: Send merchant and yield_record as strings (they'll be parsed to int by Django)
+      saleData.forEach((key, value) {
+        if (value != null && key != 'variants') {
+          // Convert numeric values to proper strings
+          if (value is num) {
+            request.fields[key] = value.toString();
+          } else {
             request.fields[key] = value.toString();
           }
-        });
-
-        // FIXED: Send variants as JSON list for Django serializer
-        if (variants != null && variants is List && variants.isNotEmpty) {
-          print('Original variants data: $variants');
-          final variantsJson = json.encode(variants);
-          request.fields['variants'] = variantsJson;
-          print('Encoded variants JSON: $variantsJson');
-        } else {
-          print('WARNING: Variants data is null or empty! Variants: $variants');
+          print('Field: $key = ${request.fields[key]}');
         }
+      });
 
-        // FIXED: Add multiple image files with the same field name
-        print('Adding ${saleImages.length} images to multipart request...');
-
-        // Create image metadata for each image
-        List<Map<String, dynamic>> imageMetadata = [];
-
-        for (int i = 0; i < saleImages.length; i++) {
-          final file = saleImages[i];
-          if (await file.exists()) {
-            try {
-              // FIXED: Use the same field name 'images' for all files
-              // This allows Django to receive them as request.FILES.getlist('images')
-              final multipartFile = await http.MultipartFile.fromPath(
-                'images', // Same field name for all images
-                file.path,
-                filename:
-                    'sale_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
-              );
-              request.files.add(multipartFile);
-
-              // Create metadata for this image
-              imageMetadata.add({
-                'name': 'Sale Image ${i + 1}',
-                'description': '',
-                'is_primary': i == 0, // First image is primary
-              });
-
-              print(
-                  'Added sale image ${i + 1}/${saleImages.length}: ${file.path}');
-            } catch (e) {
-              print('Error adding file ${file.path}: $e');
-              continue;
-            }
-          }
-        }
-
-        // FIXED: Add image metadata as JSON string
-        if (imageMetadata.isNotEmpty) {
-          request.fields['image_metadata'] = json.encode(imageMetadata);
-          print('Added image metadata: ${request.fields['image_metadata']}');
-        }
-
-        print('Sending multipart request with ${request.files.length} files');
-        print('All request fields: ${request.fields.keys.toList()}');
-
-        final streamedResponse = await request.send().timeout(
-          const Duration(minutes: 5),
-          onTimeout: () {
-            throw TimeoutException(
-                'Sale creation timed out', const Duration(minutes: 5));
-          },
-        );
-
-        response = await http.Response.fromStream(streamedResponse);
+      // CRITICAL: Add variants as JSON array string
+      if (variants != null && variants is List && variants.isNotEmpty) {
+        final variantsJson = json.encode(variants);
+        request.fields['variants'] = variantsJson;
+        print('Variants JSON: $variantsJson');
+        print('Variants count: ${variants.length}');
       } else {
-        // Send as JSON when no images
-        print('Sending JSON request (no images)');
-
-        final jsonData = Map<String, dynamic>.from(saleData);
-        print('Sale data being sent: ${json.encode(jsonData)}');
-
-        response = await http.post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode(jsonData),
-        );
+        print('⚠️ WARNING: Variants data is null or empty!');
+        return {
+          'success': false,
+          'statusCode': 400,
+          'data': {
+            'status': 'error',
+            'message': 'Variants data is required',
+          }
+        };
       }
 
-      print('Save sale response status: ${response.statusCode}');
-      print('Save sale response body: ${response.body}');
+      print('\n--- Adding Image Files ---');
 
-      final jsonResponse = _parseResponse(response);
+      // Create image metadata for each image
+      List<Map<String, dynamic>> imageMetadata = [];
 
-      return {
-        'success':
-            response.statusCode == 201 && jsonResponse['status'] == 'success',
-        'statusCode': response.statusCode,
-        'data': jsonResponse,
-      };
-    } catch (e) {
-      return _handleError(e, 'saveSale');
+      for (int i = 0; i < saleImages.length; i++) {
+        final file = saleImages[i];
+        if (await file.exists()) {
+          try {
+            // Use the same field name 'images' for all files (Django expects this)
+            final multipartFile = await http.MultipartFile.fromPath(
+              'images', // Django serializer expects 'images' field
+              file.path,
+              filename: 'sale_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+            );
+            request.files.add(multipartFile);
+
+            // Create metadata for this image
+            imageMetadata.add({
+              'name': 'Sale Image ${i + 1}',
+              'description': '',
+              'is_primary': i == 0, // First image is primary
+            });
+
+            print('Added image ${i + 1}/${saleImages.length}: ${file.path}');
+          } catch (e) {
+            print('⚠️ Error adding file ${file.path}: $e');
+            continue;
+          }
+        } else {
+          print('⚠️ File does not exist: ${file.path}');
+        }
+      }
+
+      // Add image metadata as JSON string (Django expects 'image_metadata' field)
+      if (imageMetadata.isNotEmpty) {
+        request.fields['image_metadata'] = json.encode(imageMetadata);
+        print('Image metadata: ${request.fields['image_metadata']}');
+      }
+
+      print('\n--- Request Summary ---');
+      print('Total form fields: ${request.fields.length}');
+      print('Form field keys: ${request.fields.keys.toList()}');
+      print('Form field values:');
+      request.fields.forEach((key, value) {
+        // Don't print entire variants JSON to avoid clutter
+        if (key == 'variants' || key == 'image_metadata') {
+          print('  $key: [JSON data]');
+        } else {
+          print('  $key: $value');
+        }
+      });
+      print('Total files: ${request.files.length}');
+      print('Sending multipart request...\n');
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          throw TimeoutException(
+              'Sale creation timed out', const Duration(minutes: 5));
+        },
+      );
+
+      response = await http.Response.fromStream(streamedResponse);
+    } else {
+      // Send as JSON when no images
+      print('\n--- Sending JSON Request (No Images) ---');
+      
+      // FIXED: Ensure variants is properly included
+      final jsonData = Map<String, dynamic>.from(saleData);
+      
+      // Verify variants are included
+      if (jsonData['variants'] == null || (jsonData['variants'] as List).isEmpty) {
+        print('⚠️ WARNING: Variants missing in JSON request!');
+        return {
+          'success': false,
+          'statusCode': 400,
+          'data': {
+            'status': 'error',
+            'message': 'Variants data is required',
+          }
+        };
+      }
+      
+      final jsonBody = json.encode(jsonData);
+      print('JSON Body: $jsonBody');
+      print('Sending JSON request...\n');
+
+      response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonBody,
+      );
+    }
+
+    print('\n=== SAVE SALE RESPONSE DEBUG ===');
+    print('Status Code: ${response.statusCode}');
+    print('Response Headers: ${response.headers}');
+    print('Response Body Length: ${response.body.length}');
+    
+    // Only print first 500 chars if response is too long
+    if (response.body.length > 500) {
+      print('Response Body (first 500 chars): ${response.body.substring(0, 500)}...');
+    } else {
+      print('Response Body: ${response.body}');
+    }
+    print('=== END RESPONSE DEBUG ===\n');
+
+    final jsonResponse = _parseResponse(response);
+
+    // FIXED: Check for success status
+    bool isSuccess = response.statusCode == 201 || 
+                     (response.statusCode == 200 && jsonResponse['status'] == 'success');
+
+    return {
+      'success': isSuccess,
+      'statusCode': response.statusCode,
+      'data': jsonResponse,
+    };
+  } on TimeoutException catch (e) {
+    print('\n❌ TIMEOUT ERROR: $e');
+    return {
+      'success': false,
+      'statusCode': 408,
+      'data': {
+        'status': 'error',
+        'message': 'Request timeout. The server took too long to respond.'
+      },
+    };
+  } on SocketException catch (e) {
+    print('\n❌ NETWORK ERROR: $e');
+    return {
+      'success': false,
+      'statusCode': 500,
+      'data': {
+        'status': 'error',
+        'message':
+            'Network connection error. Please check your internet connection.'
+      },
+    };
+  } catch (e, stackTrace) {
+    print('\n❌ UNEXPECTED ERROR: $e');
+    print('Stack Trace: $stackTrace');
+    return _handleError(e, 'saveSale');
+  }
+}
+
+// UPDATED: Validation method to match Django requirements
+static Map<String, dynamic>? _validateSaleData(Map<String, dynamic> saleData) {
+  Map<String, dynamic> errors = {};
+
+  // Required fields validation
+  if (saleData['merchant'] == null) {
+    errors['merchant'] = 'Merchant ID is required';
+  } else {
+    // Validate merchant is a valid integer
+    final merchantId = saleData['merchant'];
+    if (merchantId is int && merchantId <= 0) {
+      errors['merchant'] = 'Invalid merchant ID';
+    } else if (merchantId is String) {
+      final parsed = int.tryParse(merchantId);
+      if (parsed == null || parsed <= 0) {
+        errors['merchant'] = 'Invalid merchant ID';
+      }
     }
   }
+
+  if (saleData['yield_record'] == null) {
+    errors['yield_record'] = 'Yield record ID is required';
+  } else {
+    // Validate yield_record is a valid integer
+    final yieldId = saleData['yield_record'];
+    if (yieldId is int && yieldId <= 0) {
+      errors['yield_record'] = 'Invalid yield record ID';
+    } else if (yieldId is String) {
+      final parsed = int.tryParse(yieldId);
+      if (parsed == null || parsed <= 0) {
+        errors['yield_record'] = 'Invalid yield record ID';
+      }
+    }
+  }
+
+  if (saleData['payment_mode'] == null || saleData['payment_mode'].toString().isEmpty) {
+    errors['payment_mode'] = 'Payment mode is required';
+  }
+
+  if (saleData['sale_date'] == null) {
+    errors['sale_date'] = 'Sale date is required';
+  }
+
+  if (saleData['harvest_date'] == null) {
+    errors['harvest_date'] = 'Harvest date is required';
+  }
+
+  // Validate amounts
+  final totalAmount = saleData['total_amount'];
+  if (totalAmount == null || (totalAmount is num && totalAmount <= 0)) {
+    errors['total_amount'] = 'Total amount must be greater than 0';
+  }
+
+  final totalCalculatedAmount = saleData['total_calculated_amount'];
+  if (totalCalculatedAmount == null || (totalCalculatedAmount is num && totalCalculatedAmount <= 0)) {
+    errors['total_calculated_amount'] = 'Total calculated amount must be greater than 0';
+  }
+
+  // Validate variants
+  if (saleData['variants'] == null || (saleData['variants'] is List && (saleData['variants'] as List).isEmpty)) {
+    errors['variants'] = 'At least one variant is required';
+  } else if (saleData['variants'] is List) {
+    List variants = saleData['variants'];
+    for (int i = 0; i < variants.length; i++) {
+      final variant = variants[i];
+      if (variant is! Map) {
+        errors['variants'] = 'Invalid variant format at index $i';
+        break;
+      }
+      
+      final variantMap = variant as Map<String, dynamic>;
+      if (variantMap['crop_variant_id'] == null) {
+        errors['variants'] = 'Variant at index $i is missing crop_variant_id';
+        break;
+      }
+      if (variantMap['quantity'] == null || (variantMap['quantity'] is num && variantMap['quantity'] <= 0)) {
+        errors['variants'] = 'Variant at index $i has invalid quantity';
+        break;
+      }
+      if (variantMap['amount'] == null || (variantMap['amount'] is num && variantMap['amount'] <= 0)) {
+        errors['variants'] = 'Variant at index $i has invalid amount';
+        break;
+      }
+      if (variantMap['unit'] == null || variantMap['unit'].toString().isEmpty) {
+        errors['variants'] = 'Variant at index $i is missing unit';
+        break;
+      }
+    }
+  }
+
+  return errors.isEmpty ? null : errors;
+}
+
+static Map<String, dynamic>? _validateImageFiles(List<File> images) {
+  Map<String, dynamic> errors = {};
+
+  for (int i = 0; i < images.length; i++) {
+    final file = images[i];
+    
+    // Check if file exists
+    if (!file.existsSync()) {
+      errors['image_$i'] = 'File does not exist';
+      continue;
+    }
+
+    // Check file size (max 10MB per image)
+    final fileSize = file.lengthSync();
+    if (fileSize > 10 * 1024 * 1024) {
+      errors['image_$i'] = 'File size exceeds 10MB';
+    }
+
+    // Check file extension
+    final extension = file.path.split('.').last.toLowerCase();
+    if (!['jpg', 'jpeg', 'png'].contains(extension)) {
+      errors['image_$i'] = 'Invalid file format. Only JPG, JPEG, PNG allowed';
+    }
+  }
+
+  return errors.isEmpty ? null : errors;
+}
 
   /// Get all sales with filtering options
   static Future<Map<String, dynamic>> getAllSales({
@@ -183,16 +391,48 @@ class SalesService {
       if (maxAmount?.isNotEmpty == true) queryParams['max_amount'] = maxAmount!;
       if (sortBy?.isNotEmpty == true) queryParams['sort_by'] = sortBy!;
       if (page != null) queryParams['page'] = page.toString();
-      if (pageSize != null) queryParams['page_size'] = pageSize.toString();
+      if (pageSize != null)
+        queryParams['pageSize'] = pageSize.toString(); // Match Django parameter
 
       final uri = Uri.parse(getAllSalesUrl).replace(
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
 
+      print('🌐 Requesting: $uri');
+
       final response = await http.get(
         uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 30));
+
+      print('📥 Response Status: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      final jsonResponse = _parseResponse(response);
+
+      // IMPORTANT: Return the FULL jsonResponse, not just parts of it
+      return {
+        'success':
+            response.statusCode == 200 && jsonResponse['status'] == 'success',
+        'statusCode': response.statusCode,
+        'data': jsonResponse, // This contains status, message, and data object
+      };
+    } catch (e) {
+      return _handleError(e, 'getAllSales');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getRecentSales() async {
+    try {
+      final uri = Uri.parse(recentSalesUrl);
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      print('Get recent sales response status: ${response.statusCode}');
+      print('Get recent sales response body: ${response.body}');
 
       final jsonResponse = _parseResponse(response);
 
@@ -201,9 +441,10 @@ class SalesService {
             response.statusCode == 200 && jsonResponse['status'] == 'success',
         'statusCode': response.statusCode,
         'data': jsonResponse,
+        'message': jsonResponse['message'],
       };
     } catch (e) {
-      return _handleError(e, 'getAllSales');
+      return _handleError(e, 'getRecentSales');
     }
   }
 
@@ -1305,126 +1546,7 @@ class SalesService {
     }
   }
 
-  // VALIDATION AND UTILITY HELPER METHODS
-
-  /// Validate sale data before sending to API
-  static Map<String, String>? _validateSaleData(Map<String, dynamic> saleData) {
-    Map<String, String> errors = {};
-
-    // Validate merchant ID
-    if (saleData['merchant'] == null ||
-        saleData['merchant'].toString().trim().isEmpty) {
-      errors['merchant'] = 'Merchant is required';
-    }
-
-    // Validate yield record ID
-    if (saleData['yield_record'] == null ||
-        saleData['yield_record'].toString().trim().isEmpty) {
-      errors['yield_record'] = 'Yield record is required';
-    }
-
-    // Validate payment mode
-    if (saleData['payment_mode'] == null ||
-        saleData['payment_mode'].toString().trim().isEmpty) {
-      errors['payment_mode'] = 'Payment mode is required';
-    }
-
-    // Validate harvest date
-    if (saleData['harvest_date'] == null) {
-      errors['harvest_date'] = 'Harvest date is required';
-    }
-
-    // Validate financial fields
-    if (saleData['total_calculated_amount'] == null ||
-        double.tryParse(saleData['total_calculated_amount'].toString()) ==
-            null) {
-      errors['total_calculated_amount'] =
-          'Valid total calculated amount is required';
-    } else {
-      final totalAmount =
-          double.parse(saleData['total_calculated_amount'].toString());
-      if (totalAmount <= 0) {
-        errors['total_calculated_amount'] =
-            'Total calculated amount must be greater than 0';
-      }
-    }
-
-    // FIXED: Validate variants (not sale_variants)
-    if (saleData['variants'] == null ||
-        (saleData['variants'] as List).isEmpty) {
-      errors['variants'] = 'At least one variant must be specified';
-    } else {
-      final variants = saleData['variants'] as List;
-      for (int i = 0; i < variants.length; i++) {
-        final variant = variants[i];
-        if (variant['crop_variant_id'] == null) {
-          errors['variant_${i}_crop_variant_id'] =
-              'Crop variant ID is required';
-        }
-        if (variant['quantity'] == null ||
-            double.tryParse(variant['quantity'].toString()) == null ||
-            double.parse(variant['quantity'].toString()) <= 0) {
-          errors['variant_${i}_quantity'] = 'Valid quantity is required';
-        }
-        if (variant['amount'] == null ||
-            double.tryParse(variant['amount'].toString()) == null ||
-            double.parse(variant['amount'].toString()) <= 0) {
-          errors['variant_${i}_amount'] = 'Valid amount per unit is required';
-        }
-        if (variant['unit'] == null ||
-            variant['unit'].toString().trim().isEmpty) {
-          errors['variant_${i}_unit'] = 'Unit is required';
-        }
-      }
-    }
-
-    return errors.isEmpty ? null : errors;
-  }
-
-  /// Validate image files before upload
-  static Map<String, String>? _validateImageFiles(List<File> files) {
-    Map<String, String> errors = {};
-
-    if (files.length > 10) {
-      errors['sale_images'] = 'Maximum 10 images are allowed';
-      return errors;
-    }
-
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
-    const maxFileSize = 5 * 1024 * 1024; // 5MB
-
-    for (int i = 0; i < files.length; i++) {
-      final file = files[i];
-
-      // Check if file exists
-      if (!file.existsSync()) {
-        errors['file_$i'] = 'File does not exist';
-        continue;
-      }
-
-      // Check file extension
-      final fileName = file.path.toLowerCase();
-      final hasValidExtension =
-          allowedExtensions.any((ext) => fileName.endsWith(ext));
-
-      if (!hasValidExtension) {
-        errors['file_$i'] =
-            'Invalid file type. Allowed: ${allowedExtensions.join(', ')}';
-      }
-
-      // Check file size
-      try {
-        final fileSize = file.lengthSync();
-        if (fileSize > maxFileSize) {
-          errors['file_$i'] = 'File size exceeds 5MB limit';
-        }
-      } catch (e) {
-        errors['file_$i'] = 'Unable to read file size';
-      }
-    }
-
-    return errors.isEmpty ? null : errors;
-  }
+  
 
   /// Parse HTTP response
   static Map<String, dynamic> _parseResponse(http.Response response) {

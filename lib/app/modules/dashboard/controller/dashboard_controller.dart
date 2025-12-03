@@ -1,15 +1,21 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../../../data/services/dashboard/dashboard_service.dart';
+import '../../../data/services/sales/sales_service.dart';
 
 class DashboardController extends GetxController {
   // Service instance
   final DashboardService _dashboardService = DashboardService();
-
+  final SalesService _salesService = SalesService();
   // Observable variables
   var selectedIndex = 1.obs;
   var selectedPeriod = 'month'.obs;
   var isLoading = false.obs;
+
+  // Recent sales data
+  var recentSales = <Map<String, dynamic>>[].obs;
+  var recentSalesPeriod = ''.obs;
+  var recentSalesPeriodLabel = ''.obs;
 
   // Revenue and Expense data (API-driven)
   var totalRevenue = 0.0.obs;
@@ -56,10 +62,12 @@ class DashboardController extends GetxController {
       final results = await Future.wait([
         _loadRevenueData(),
         _loadExpenseData(),
+        _loadRecentSales(),
       ]);
 
       bool revenueSuccess = results[0];
       bool expenseSuccess = results[1];
+      bool recentSalesSuccess = results[2];
 
       // If both failed, show error
       if (!revenueSuccess && !expenseSuccess) {
@@ -85,6 +93,35 @@ class DashboardController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<bool> _loadRecentSales() async {
+    try {
+      final result = await SalesService.getRecentSales();
+
+      if (result['success'] == true) {
+        final data = result['data'];
+
+        if (data != null) {
+          recentSales.value = List<Map<String, dynamic>>.from(
+              (data['sales'] as List).map((e) => Map<String, dynamic>.from(e)));
+          recentSalesPeriod.value = data['period'] ?? '';
+          recentSalesPeriodLabel.value = data['period_label'] ?? '';
+
+          print('Recent sales loaded: ${recentSales.length} sales');
+
+          return true; // SUCCESS
+        }
+      } else {
+        print('Failed to load recent sales: ${result['message']}');
+        return false; // FAIL
+      }
+    } catch (e) {
+      print('Error loading recent sales: $e');
+      return false; // FAIL
+    }
+
+    return false; // fallback
   }
 
   /// Load revenue data from API
@@ -466,6 +503,43 @@ class DashboardController extends GetxController {
       case 'year':
       default:
         return totalExpenses.value;
+    }
+  }
+
+  // Get payment status color
+  Color getPaymentStatusColor(String? paymentStatus) {
+    switch (paymentStatus?.toLowerCase()) {
+      case 'paid':
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'failed':
+      case 'cancelled':
+        return Colors.red;
+      case 'partial':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Get sale status color
+  Color getSaleStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+      case 'delivered':
+        return Colors.green;
+      case 'pending':
+      case 'processing':
+        return Colors.orange;
+      case 'cancelled':
+      case 'failed':
+        return Colors.red;
+      case 'draft':
+        return Colors.grey;
+      default:
+        return Colors.grey;
     }
   }
 

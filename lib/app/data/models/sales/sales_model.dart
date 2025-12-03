@@ -345,6 +345,7 @@ class SaleModel {
   final String cropName;
   final String paymentMode;
   final DateTime harvestDate;
+  final DateTime saleDate;
   final String? billUrl;
 
   // Financial fields
@@ -380,6 +381,7 @@ class SaleModel {
     required this.cropName,
     required this.paymentMode,
     required this.harvestDate,
+    required this.saleDate,
     this.billUrl,
     required this.totalAmount,
     this.commission = 0.0,
@@ -488,6 +490,7 @@ class SaleModel {
           json['yield_record_id']?.toString() ??
           '',
       cropName: json['crop_name']?.toString() ?? '',
+      saleDate: parseDate(json['sale_date'], DateTime.now()),
       paymentMode: json['payment_mode']?.toString() ?? '',
       harvestDate: parseDate(json['harvest_date'], DateTime.now()),
       billUrl: json['bill_url']?.toString(),
@@ -510,7 +513,7 @@ class SaleModel {
           double.tryParse(json['pending_amount']?.toString() ?? '0') ?? 0.0,
       paymentStatus: json['payment_status']?.toString() ?? 'pending',
       status: json['status']?.toString() ?? 'pending',
-      createdAt: parseDate(json['created_at'],DateTime.now()),
+      createdAt: parseDate(json['created_at'], DateTime.now()),
       updatedAt: parseDate(json['updated_at'], DateTime.now()),
 
       // Parse sale variants
@@ -570,7 +573,8 @@ class SaleModel {
       'merchant': merchantId,
       'yield_record': yieldRecordId,
       'payment_mode': paymentMode,
-      'harvest_date': harvestDate.toIso8601String(),
+      'sale_date': saleDate.toIso8601String().split('T').first,
+      'harvest_date': harvestDate.toIso8601String().split('T').first,
       'total_amount': totalAmount,
       'commission': commission,
       'lorry_rent': lorryRent,
@@ -650,6 +654,7 @@ class SaleModel {
     String? cropName,
     String? paymentMode,
     DateTime? harvestDate,
+    DateTime? saleDate,
     String? billUrl,
     double? totalAmount,
     double? commission,
@@ -677,6 +682,7 @@ class SaleModel {
       cropName: cropName ?? this.cropName,
       paymentMode: paymentMode ?? this.paymentMode,
       harvestDate: harvestDate ?? this.harvestDate,
+      saleDate: saleDate ?? this.saleDate,
       billUrl: billUrl ?? this.billUrl,
       totalAmount: totalAmount ?? this.totalAmount,
       commission: commission ?? this.commission,
@@ -711,6 +717,7 @@ class SaleSummary {
   final String cropName;
   final String paymentMode;
   final DateTime harvestDate;
+  final DateTime saleDate;
   final double finalAmount;
   final double paidAmount;
   final double pendingAmount;
@@ -727,6 +734,7 @@ class SaleSummary {
     required this.cropName,
     required this.paymentMode,
     required this.harvestDate,
+    required this.saleDate,
     required this.finalAmount,
     required this.paidAmount,
     required this.pendingAmount,
@@ -744,6 +752,9 @@ class SaleSummary {
       merchantName: json['merchant_name']?.toString() ?? '',
       cropName: json['crop_name']?.toString() ?? '',
       paymentMode: json['payment_mode']?.toString() ?? '',
+      saleDate: json['sale_date'] != null
+          ? DateTime.parse(json['sale_date'])
+          : DateTime.now(),
       harvestDate: json['harvest_date'] != null
           ? DateTime.parse(json['harvest_date'])
           : DateTime.now(),
@@ -774,6 +785,7 @@ class SaleSummary {
       cropName: cropName,
       paymentMode: paymentMode,
       harvestDate: harvestDate,
+      saleDate: saleDate,
       totalAmount: finalAmount,
       totalCalculatedAmount: finalAmount,
       finalAmount: finalAmount,

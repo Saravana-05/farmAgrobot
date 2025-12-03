@@ -155,7 +155,13 @@ const String pdfExport = baseUrl + 'wages/pdf/weekly/';
 // ============= Employee Report =============
 const String empReport = baseUrl + 'employee-report/';
 const String singleEmployeeReportUrl = baseUrl + 'employee/{id}/report/';
-
+const String empExportExcel = baseUrl + 'export/employee/{id}/excel/';
+const String empExportPdf = baseUrl + 'export/employee/{id}/pdf/';
+const String empAdvanceCreateUrl = baseUrl + 'employee-advances/create/';
+const String getEmpAdvancesUrl = baseUrl + 'employee-advances/';
+const String getAdvanceDetailUrl = baseUrl + 'employee-advances/{id}/';
+const String getAdvanceSummaryUrl = baseUrl + 'employee-advances/summary/{id}/';
+const String deleteAdvanceUrl = baseUrl + 'employee-advances/{id}/delete/';
 // ============= ATTENDANCE END =============
 
 // Crop URLs
@@ -197,6 +203,9 @@ const String updateYieldUrl = baseUrl + 'yields/update-with-options';
 const String deleteYieldUrl = baseUrl + 'yields/delete/';
 const String yieldSummaryUrl = baseUrl + 'yields/summary/';
 const String addBillUrl = baseUrl + 'yields/add-bill-image';
+const String yieldDashboardUrl = baseUrl + 'crop-dashboard/';
+const String cropComparisonUrl = baseUrl + 'crop-comparison-dashboard/';
+
 
 // Sales URLs - START
 const String saveSaleUrl = baseUrl + 'sales/';
@@ -208,6 +217,8 @@ const String updateSaleStatusUrl = baseUrl + 'sales/';
 const String salesByMerchantUrl = baseUrl + 'sales/merchant/';
 const String salesSummaryUrl = baseUrl + 'sales/summary/';
 const String salesAnalyticsUrl = baseUrl + 'sales/analytics/';
+// Recent Sales URL
+const String recentSalesUrl = baseUrl+'sales/recent-sales/';
 
 // Payment URLs
 const String addPaymentUrl = baseUrl + 'sales/';

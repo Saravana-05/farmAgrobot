@@ -15,9 +15,9 @@ class SettingsController extends GetxController {
   
   
   
-  void navigateToProfile() {
-    // Navigate to profile screen
-    // Get.toNamed('/profile');
+  void navigateToYieldAnalytics() {
+    // Navigate to yield screen
+     Get.toNamed('/yield_analytics');
   }
   
 

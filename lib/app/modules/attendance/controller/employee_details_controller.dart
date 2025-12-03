@@ -1,17 +1,19 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
 import '../../../data/services/attendance/attendance_service.dart';
 import '../../../data/models/attendance/attendance_record_model.dart';
 
 class EmployeeDetailsController extends GetxController {
   // Employee basic info
   var employeeData = Rxn<EmployeeAttendanceRecord>();
-  
+  var profileImageUrl = Rxn<String>();
   // Loading states
   var isLoading = false.obs;
   var isLoadingReport = false.obs;
   var isProcessingPayment = false.obs;
+  var isExporting = false.obs;
   
   // Employee report data
   var employeeReport = Rxn<EmployeeReportData>();
@@ -50,26 +52,35 @@ class EmployeeDetailsController extends GetxController {
         if (arguments is EmployeeAttendanceRecord) {
           employeeData.value = arguments;
           print('Employee ID: ${arguments.id}'); // Debug log
+          print('Employee Daily Wage: ${arguments.dailyWage}'); // ✅ Debug log
         } else if (arguments is Map<String, dynamic>) {
           // If arguments are passed as a map
           final employeeId = arguments['employeeId'] ?? arguments['id'];
           if (employeeId != null) {
-            // Create a temporary employee record if we only have ID
+            // ✅ FIX: Parse dailyWage from map if available
+            final dailyWage = arguments['dailyWage'] != null 
+                ? _parseDoubleSafely(arguments['dailyWage'])
+                : 0.0;
+                
             employeeData.value = EmployeeAttendanceRecord(
               id: employeeId.toString(),
               name: arguments['name'] ?? 'Unknown Employee', 
-              dailyWage: 0, 
+              dailyWage: dailyWage, // ✅ Use parsed wage instead of hardcoded 0
               hasWage: true,
             );
+            
+            print('Created employee from map - Daily Wage: $dailyWage'); // Debug log
           }
         } else if (arguments is String) {
           // If only ID is passed as string
+          // ⚠️ Keep as 0 here, will be updated from API
           employeeData.value = EmployeeAttendanceRecord(
             id: arguments,
             name: 'Loading...', 
             dailyWage: 0, 
             hasWage: true,
           );
+          print('Created employee from string ID - will fetch wage from API'); // Debug log
         }
         
         if (employeeData.value != null) {
@@ -150,6 +161,16 @@ class EmployeeDetailsController extends GetxController {
       // Reset all data first
       _resetReportData();
       
+      // ✅ CRITICAL FIX: Parse daily wage from API FIRST
+      final dailyWageFromApi = _parseDoubleSafely(reportData['daily_wage']);
+      print('Daily wage from API: $dailyWageFromApi'); // Debug log
+
+      final imageUrl = reportData['profile_image_url']?.toString();
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        profileImageUrl.value = imageUrl;
+        print('Profile image URL: $imageUrl');
+      }
+      
       // Parse summary data - now using the correct field names from API
       final summary = reportData['period_summary'];
       if (summary != null && summary is Map<String, dynamic>) {
@@ -162,6 +183,8 @@ class EmployeeDetailsController extends GetxController {
         totalWagesPaid.value = _parseDoubleSafely(summary['total_wages_paid']);
         totalWagesPending.value = _parseDoubleSafely(summary['total_wages_pending']);
         paymentPercentage.value = _parseDoubleSafely(summary['payment_percentage']);
+        
+        print('Parsed wages - Earned: ${totalWagesEarned.value}, Paid: ${totalWagesPaid.value}, Pending: ${totalWagesPending.value}'); // Debug log
       }
 
       // Parse daily attendance data - using correct field name
@@ -192,26 +215,32 @@ class EmployeeDetailsController extends GetxController {
         }
       }
 
-      // Update employee data with information from API
+      // ✅ CRITICAL FIX: Update employee data with API information
       final currentEmployee = employeeData.value!;
       employeeData.value = EmployeeAttendanceRecord(
         id: currentEmployee.id,
         name: reportData['employee_name']?.toString() ?? currentEmployee.name,
-        dailyWage: _parseDoubleSafely(reportData['daily_wage']),
+        dailyWage: dailyWageFromApi, // ✅ Use the parsed wage from API
+        tamilName: reportData['tamil_name']?.toString(),  // ✅ NEW
+        profileImageUrl: imageUrl,
         hasWage: true,
       );
+      
+      print('Updated employee data - Name: ${employeeData.value!.name}, Daily Wage: ${employeeData.value!.dailyWage}'); // Debug log
 
       // Create employee report object
       employeeReport.value = EmployeeReportData(
         employeeId: reportData['employee_id']?.toString() ?? employeeData.value!.id,
         employeeName: reportData['employee_name']?.toString() ?? employeeData.value!.name,
-        dailyWage: _parseDoubleSafely(reportData['daily_wage']),
+        dailyWage: dailyWageFromApi, // ✅ Use the parsed wage
+        
         periodSummary: summary,
         dailyAttendance: dailyAttendanceData,
         weeklyBreakdown: weeklyBreakdown,
       );
       
       print('Report processed successfully'); // Debug log
+      print('Final daily wage in report: ${employeeReport.value!.dailyWage}'); // Debug log
       
     } catch (e) {
       print('Error processing employee report: $e');
@@ -441,128 +470,206 @@ class EmployeeDetailsController extends GetxController {
     );
   }
 
+  /// Export report as Excel
+  Future<void> exportReportAsExcel() async {
+    if (employeeData.value == null || isExporting.value) return;
+
+    isExporting.value = true;
+
+    try {
+      Get.dialog(
+        const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Exporting to Excel...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      final response = await AttendanceService.exportEmployeeReportExcel(
+        employeeId: employeeData.value!.id,
+        startDate: startDate.value,
+        endDate: endDate.value,
+      );
+
+      Get.back(); // Close loading dialog
+
+      if (response != null && response['success'] == true) {
+        final bytes = response['data'] as List<int>;
+        final filename = response['filename'] as String;
+
+        final filePath = await AttendanceService.saveFileToDevice(
+          bytes: bytes,
+          filename: filename,
+        );
+
+        if (filePath != null) {
+          _showExportSuccessDialog(filePath, 'Excel');
+        } else {
+          _showErrorMessage('Failed to save Excel file');
+        }
+      } else {
+        _showErrorMessage(response?['error']?.toString() ?? 'Export failed');
+      }
+    } catch (e) {
+      Get.back(); // Close loading dialog
+      _handleException('Failed to export Excel', e);
+    } finally {
+      isExporting.value = false;
+    }
+  }
+
+  /// Export report as PDF
+  Future<void> exportReportAsPDF() async {
+    if (employeeData.value == null || isExporting.value) return;
+
+    isExporting.value = true;
+
+    try {
+      Get.dialog(
+        const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Exporting to PDF...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      final response = await AttendanceService.exportEmployeeReportPDF(
+        employeeId: employeeData.value!.id,
+        startDate: startDate.value,
+        endDate: endDate.value,
+      );
+
+      Get.back(); // Close loading dialog
+
+      if (response != null && response['success'] == true) {
+        final bytes = response['data'] as List<int>;
+        final filename = response['filename'] as String;
+
+        final filePath = await AttendanceService.saveFileToDevice(
+          bytes: bytes,
+          filename: filename,
+        );
+
+        if (filePath != null) {
+          _showExportSuccessDialog(filePath, 'PDF');
+        } else {
+          _showErrorMessage('Failed to save PDF file');
+        }
+      } else {
+        _showErrorMessage(response?['error']?.toString() ?? 'Export failed');
+      }
+    } catch (e) {
+      Get.back(); // Close loading dialog
+      _handleException('Failed to export PDF', e);
+    } finally {
+      isExporting.value = false;
+    }
+  }
+
+  /// Show export options dialog
+  void showExportOptionsDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Export Report'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.table_chart, color: Colors.green),
+              title: const Text('Export as Excel'),
+              subtitle: const Text('Best for data analysis'),
+              onTap: () {
+                Get.back();
+                exportReportAsExcel();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('Export as PDF'),
+              subtitle: const Text('Best for printing'),
+              onTap: () {
+                Get.back();
+                exportReportAsPDF();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show export success dialog with option to open file
+  void _showExportSuccessDialog(String filePath, String format) {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green.shade700),
+            const SizedBox(width: 8),
+            const Text('Export Successful'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$format file saved successfully!'),
+            const SizedBox(height: 12),
+            Text(
+              'Location: $filePath',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              OpenFile.open(filePath);
+            },
+            child: const Text('Open File'),
+          ),
+        ],
+      ),
+    );
+    
+  }
+
   @override
   void onClose() {
     super.onClose();
-  }
-}
-
-// MARK: - Data Models (Updated with better null safety)
-
-class EmployeeReportData {
-  final String employeeId;
-  final String employeeName;
-  final double dailyWage;
-  final Map<String, dynamic>? periodSummary;
-  final List<AttendanceDay> dailyAttendance;
-  final List<WeeklyBreakdown> weeklyBreakdown;
-
-  EmployeeReportData({
-    required this.employeeId,
-    required this.employeeName,
-    required this.dailyWage,
-    this.periodSummary,
-    required this.dailyAttendance,
-    required this.weeklyBreakdown,
-  });
-}
-
-class AttendanceDay {
-  final String date;
-  final String dayName;
-  final String status;
-  final int? statusCode;
-  final double wageEarned;
-
-  AttendanceDay({
-    required this.date,
-    required this.dayName,
-    required this.status,
-    this.statusCode,
-    required this.wageEarned,
-  });
-
-  factory AttendanceDay.fromJson(Map<String, dynamic> json) {
-    return AttendanceDay(
-      date: json['date']?.toString() ?? '',
-      dayName: json['day_name']?.toString() ?? '',
-      status: json['status']?.toString() ?? 'Not Marked',
-      statusCode: json['status_code'] is int ? json['status_code'] : 
-                  (json['status_code'] != null ? int.tryParse(json['status_code'].toString()) : null),
-      wageEarned: _parseDoubleSafelyStatic(json['wage_earned']),
-    );
-  }
-
-  static double _parseDoubleSafelyStatic(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
-}
-
-class WeeklyBreakdown {
-  final String weekStart;
-  final String weekEnd;
-  final int presentDays;
-  final int halfDays;
-  final int absentDays;
-  final double totalWagesEarned;
-  final double wagesPaid;
-  final double wagesPending;
-  final String paymentStatus;
-
-  WeeklyBreakdown({
-    required this.weekStart,
-    required this.weekEnd,
-    required this.presentDays,
-    required this.halfDays,
-    required this.absentDays,
-    required this.totalWagesEarned,
-    required this.wagesPaid,
-    required this.wagesPending,
-    required this.paymentStatus,
-  });
-
-  factory WeeklyBreakdown.fromJson(Map<String, dynamic> json) {
-    return WeeklyBreakdown(
-      weekStart: json['week_start']?.toString() ?? '',
-      weekEnd: json['week_end']?.toString() ?? '',
-      presentDays: _parseIntSafelyStatic(json['present_days']),
-      halfDays: _parseIntSafelyStatic(json['half_days']),
-      absentDays: _parseIntSafelyStatic(json['absent_days']),
-      totalWagesEarned: _parseDoubleSafelyStatic(json['total_wages_earned']),
-      wagesPaid: _parseDoubleSafelyStatic(json['wages_paid']),
-      wagesPending: _parseDoubleSafelyStatic(json['wages_pending']),
-      paymentStatus: json['payment_status']?.toString() ?? 'pending',
-    );
-  }
-
-  static int _parseIntSafelyStatic(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is double) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
-    return 0;
-  }
-
-  static double _parseDoubleSafelyStatic(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
-}
-
-// Extension methods
-extension DateTimeExtensions on DateTime {
-  DateTime get mondayOfWeek {
-    return subtract(Duration(days: weekday - 1));
-  }
-  
-  String toDateString() {
-    return DateFormat('yyyy-MM-dd').format(this);
   }
 }

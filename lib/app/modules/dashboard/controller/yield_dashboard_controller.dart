@@ -448,6 +448,8 @@ class CropYieldController extends GetxController {
     };
   }
 
+  
+
   /// Get crop comparison data
   Future<Map<String, dynamic>> getCropComparison(List<String> cropIds) async {
     try {

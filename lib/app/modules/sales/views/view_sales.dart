@@ -6,7 +6,6 @@ import '../controller/view_sales_controller.dart';
 
 class ViewSales extends StatelessWidget {
   final ViewSalesController controller = Get.put(ViewSalesController());
-
   final TextStyle textStyle = const TextStyle(fontSize: 12.0);
   final TextStyle boldTextStyle =
       const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold);
@@ -206,8 +205,7 @@ class ViewSales extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Summary Information
-
+          // Summary Information Only
           Obx(() => Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -274,58 +272,69 @@ class ViewSales extends StatelessWidget {
                 final backgroundColor = backgroundColors[index % 2];
 
                 return Container(
-                  margin: EdgeInsets.only(bottom: 12),
+                  margin: EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: backgroundColor,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.08),
+                        color: Colors.grey.withOpacity(0.06),
                         spreadRadius: 0,
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
                       ),
                     ],
                   ),
                   child: InkWell(
                     onTap: () => _showSaleDetailsDialog(sale),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: EdgeInsets.all(16),
+                      padding: EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header Row - Merchant Name and Sale ID
+                          // Header Row - Merchant Name and Menu
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  sale.merchantName,
-                                  style: boldTextStyle.copyWith(
-                                    color: kPrimaryColor,
-                                    fontSize: 16,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.person,
+                                        color: kPrimaryColor, size: 16),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        sale.merchantName,
+                                        style: TextStyle(
+                                          color: kPrimaryColor,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              // Sale ID Badge
                               Container(
                                 padding: EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: kPrimaryColor.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   '#${sale.id}',
-                                  style: textStyle.copyWith(
+                                  style: TextStyle(
                                     color: kPrimaryColor,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 12,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              SizedBox(width: 6),
                               // Actions Menu
                               PopupMenuButton<String>(
                                 icon: Icon(
@@ -372,18 +381,6 @@ class ViewSales extends StatelessWidget {
                                     ),
                                   ),
                                   PopupMenuItem(
-                                    value: 'pdf_bill',
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.picture_as_pdf,
-                                            color: Colors.orange, size: 18),
-                                        SizedBox(width: 12),
-                                        Text('Generate PDF'),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
                                     value: 'delete',
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -407,10 +404,7 @@ class ViewSales extends StatelessWidget {
                                     case 'payment':
                                       _showAddPaymentDialog(sale);
                                       break;
-                                    case 'pdf_bill':
-                                      controller
-                                          .generatePdfBill(sale.id.toString());
-                                      break;
+
                                     case 'delete':
                                       _showDeleteConfirmation(sale);
                                       break;
@@ -420,95 +414,55 @@ class ViewSales extends StatelessWidget {
                             ],
                           ),
 
-                          SizedBox(height: 12),
+                          SizedBox(height: 8),
 
-                          // Content Row - Image and Details
+                          // Crop Name
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Sale Images Preview
-                              _buildSaleImagesPreview(sale),
-
-                              SizedBox(width: 16),
-
-                              // Sale Details
+                              Icon(Icons.agriculture,
+                                  color: Colors.green[700], size: 14),
+                              SizedBox(width: 4),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Crop Name and Final Amount
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            sale.cropName,
-                                            style: textStyle.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.grey[800],
-                                              fontSize: 14,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          controller
-                                              .formatCurrency(sale.finalAmount),
-                                          style: boldTextStyle.copyWith(
-                                            color: Colors.green[700],
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    SizedBox(height: 8),
-
-                                    // Sale Variants Summary
-                                    Text(
-                                      'Items: ${controller.getSaleVariantsSummary(sale)}',
-                                      style: textStyle.copyWith(
-                                        color: Colors.grey[600],
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  sale.cropName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[800],
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
 
-                          SizedBox(height: 16),
+                          SizedBox(height: 8),
 
-                          // Footer Row - Status and Date Information
+                          // Amount, Status, and Date Row
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Pending Amount Section
+                              // Amount Column
                               Expanded(
-                                flex: 2,
+                                flex: 3,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Pending Amount',
+                                      'Amount',
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        color: kSecondaryColor,
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
-                                    SizedBox(height: 2),
+                                    SizedBox(height: 1),
                                     Text(
                                       controller
-                                          .formatCurrency(sale.pendingAmount),
+                                          .formatCurrency(sale.finalAmount),
                                       style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.red[700],
+                                        fontSize: 14,
+                                        color: Colors.green[700],
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -516,64 +470,74 @@ class ViewSales extends StatelessWidget {
                                 ),
                               ),
 
-                              // Payment Status Badge
+                              // Payment Status Column
                               Expanded(
-                                flex: 2,
-                                child: Center(
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: controller
-                                          .getPaymentStatusColor(
-                                              sale.paymentStatus)
-                                          .withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Status',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
                                         color: controller
                                             .getPaymentStatusColor(
                                                 sale.paymentStatus)
-                                            .withOpacity(0.3),
-                                        width: 1,
+                                            .withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: controller
+                                              .getPaymentStatusColor(
+                                                  sale.paymentStatus)
+                                              .withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        sale.paymentStatus.toUpperCase(),
+                                        style: TextStyle(
+                                          color:
+                                              controller.getPaymentStatusColor(
+                                                  sale.paymentStatus),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 8,
+                                          letterSpacing: 0.3,
+                                        ),
+                                        textAlign: TextAlign.center,
                                       ),
                                     ),
-                                    child: Text(
-                                      sale.paymentStatus.toUpperCase(),
-                                      style: textStyle.copyWith(
-                                        color: controller.getPaymentStatusColor(
-                                            sale.paymentStatus),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 10,
-                                        letterSpacing: 0.5,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
+                                  ],
                                 ),
                               ),
 
-                              // Sale Date
+                              // Sale Date Column
                               Expanded(
-                                flex: 2,
+                                flex: 3,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
                                       'Sale Date',
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[500],
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
-                                    SizedBox(height: 2),
+                                    SizedBox(height: 5),
                                     Text(
-                                      controller
-                                          .formatTimestamp(sale.harvestDate),
-                                      style: textStyle.copyWith(
-                                        color: Colors.grey[700],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                                      controller.formatTimestamp(sale.saleDate),
+                                      style: TextStyle(
+                                        color: kSecondaryColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
                                       ),
                                       textAlign: TextAlign.end,
                                     ),
@@ -582,6 +546,36 @@ class ViewSales extends StatelessWidget {
                               ),
                             ],
                           ),
+
+                          // Pending Amount Indicator (if any)
+                          if (sale.pendingAmount > 0) ...[
+                            SizedBox(height: 6),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.red[200]!),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber_rounded,
+                                      size: 12, color: Colors.red[700]),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Pending: ${controller.formatCurrency(sale.pendingAmount)}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.red[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -603,215 +597,6 @@ class ViewSales extends StatelessWidget {
           ),
           child: Obx(() => _buildPaginationControls()),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSaleImagesPreview(SaleModel sale) {
-    List<String> imageUrls = controller.getSaleImageUrls(sale);
-
-    if (imageUrls.isEmpty) {
-      return Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.image_not_supported_outlined,
-              color: Colors.grey[400],
-              size: 20,
-            ),
-            Text(
-              'No Images',
-              style: TextStyle(
-                fontSize: 8,
-                color: Colors.grey[400],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (imageUrls.length == 1) {
-      return Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: GestureDetector(
-            onTap: () => _showSaleImagesDialog(imageUrls, 0),
-            child: Image.network(
-              imageUrls.first,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: kPrimaryColor,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.red[50],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 16,
-                      ),
-                      Text(
-                        'Error',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 8,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Multiple images - create a grid preview
-    return GestureDetector(
-      onTap: () => _showSaleImagesDialog(imageUrls, 0),
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Stack(
-          children: [
-            // Background grid
-            _buildImageGrid(imageUrls),
-
-            // Overlay for count if more than 4 images
-            if (imageUrls.length > 4)
-              Positioned(
-                bottom: 2,
-                right: 2,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '+${imageUrls.length - 4}',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageGrid(List<String> imageUrls) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            children: [
-              // Top left image
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(right: 1, bottom: 1),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(8),
-                    ),
-                    child: Image.network(
-                      imageUrls[0],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: Icon(Icons.image, size: 12),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              // Bottom left image (if available)
-              if (imageUrls.length > 2)
-                Expanded(
-                  child: Container(
-                    margin: EdgeInsets.only(right: 1, top: 1),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(8),
-                      ),
-                      child: Image.network(
-                        imageUrls[2],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[200],
-                            child: Icon(Icons.image, size: 12),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        // Right side image
-        if (imageUrls.length > 1)
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.only(left: 1),
-              child: ClipRRect(
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
-                ),
-                child: Image.network(
-                  imageUrls[1],
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[200],
-                      child: Icon(Icons.image, size: 12),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

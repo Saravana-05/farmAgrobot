@@ -114,6 +114,237 @@ class AttendanceUIController extends GetxController {
     }
   }
 
+  /// Export attendance data to Excel file
+  Future<void> exportAttendanceToExcel(
+      DateTime fromDate, DateTime toDate) async {
+    if (isExporting.value) return;
+
+    // Validate date range
+    if (fromDate.isAfter(toDate)) {
+      _showErrorMessage('From date must be before or equal to To date');
+      return;
+    }
+
+    isExporting.value = true;
+
+    try {
+      // Check storage permissions
+      if (!await _checkStoragePermissions()) {
+        _showErrorMessage('Storage permission is required to save Excel files');
+        return;
+      }
+
+      print(
+          '📥 Exporting attendance from ${fromDate.toDateString()} to ${toDate.toDateString()}');
+
+      final response = await AttendanceService.exportAttendanceToExcel(
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+
+      if (response['success'] == true) {
+        final excelData = response['data'];
+        final filename = response['filename'] ?? 'attendance_export.xlsx';
+
+        if (excelData != null && excelData.isNotEmpty) {
+          await _saveExcelFile(excelData, filename, fromDate, toDate);
+        } else {
+          _showErrorMessage('No Excel data received from server');
+        }
+      } else {
+        // Extract and show error message
+        String errorMessage =
+            response['message'] ?? 'Failed to export attendance';
+        _showErrorMessage(errorMessage);
+      }
+    } catch (e) {
+      print('💥 Export exception: $e');
+      _handleException('Failed to export attendance', e);
+    } finally {
+      isExporting.value = false;
+    }
+  }
+
+  /// Save Excel file to device storage
+  Future<void> _saveExcelFile(
+    List<int> excelBytes,
+    String filename,
+    DateTime fromDate,
+    DateTime toDate,
+  ) async {
+    try {
+      Directory? directory;
+
+      if (Platform.isAndroid) {
+        // Try to save to Downloads folder
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          // Fallback to external storage directory
+          directory = await getExternalStorageDirectory();
+          directory ??= await getApplicationDocumentsDirectory();
+        }
+      } else if (Platform.isIOS) {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        throw Exception('Could not access storage directory');
+      }
+
+      final file = File('${directory.path}/$filename');
+      await file.writeAsBytes(excelBytes);
+
+      print('✅ Excel file saved: ${file.path}');
+
+      _showExportSuccessDialog(file.path, filename, fromDate, toDate);
+    } catch (e) {
+      print('❌ Failed to save Excel file: $e');
+      _handleException('Failed to save Excel file', e);
+    }
+  }
+
+  /// Show export success dialog with options
+  void _showExportSuccessDialog(
+    String filePath,
+    String fileName,
+    DateTime fromDate,
+    DateTime toDate,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.file_download_done,
+                color: Colors.green.shade600, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Export Successful', overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Attendance data has been exported successfully!',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.insert_drive_file,
+                            size: 16, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            fileName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Period: ${DateFormat('dd/MM/yyyy').format(fromDate)} - ${DateFormat('dd/MM/yyyy').format(toDate)}',
+                      style:
+                          TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Saved to: ${Platform.isAndroid ? "Downloads" : "Documents"}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Get.back();
+              await _openExcelFile(filePath);
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Open File'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open Excel file with default app
+  Future<void> _openExcelFile(String filePath) async {
+    try {
+      final result = await OpenFile.open(filePath);
+
+      if (result.type != ResultType.done) {
+        Get.dialog(
+          AlertDialog(
+            title: const Text('Cannot Open Excel File'),
+            content: const Text(
+              'No Excel viewer app found. Please install Microsoft Excel, Google Sheets, or WPS Office from the Play Store or App Store to view the exported file.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _showErrorMessage(
+        'Could not open Excel file. Please check if you have an Excel viewer app installed.',
+      );
+    }
+  }
+
+  /// Check and request storage permissions
+  Future<bool> _checkStoragePermissions() async {
+    if (Platform.isAndroid) {
+      // For Android 11+ (API 30+), we need to handle differently
+      if (Platform.version.contains('11') ||
+          Platform.version.contains('12') ||
+          Platform.version.contains('13')) {
+        // For Android 11+, we can directly write to Download folder
+        // No special permission needed for app-specific directories
+        return true;
+      } else {
+        // For older Android versions, request storage permission
+        final status = await Permission.storage.status;
+        if (status.isDenied) {
+          final result = await Permission.storage.request();
+          return result.isGranted;
+        }
+        return status.isGranted;
+      }
+    }
+    // iOS doesn't need storage permission for Documents directory
+    return true;
+  }
+
   /// Process weekly data and update local state
   Future<void> _processWeeklyData(WeeklyData data) async {
     print('=== STARTING DATA PROCESSING ===');
@@ -1327,18 +1558,6 @@ class AttendanceUIController extends GetxController {
     }
   }
 
-  Future<bool> _checkStoragePermissions() async {
-    if (Platform.isAndroid) {
-      final status = await Permission.storage.status;
-      if (status.isDenied) {
-        final result = await Permission.storage.request();
-        return result.isGranted;
-      }
-      return status.isGranted;
-    }
-    return true;
-  }
-
   Future<void> _savePdfFile(List<int> pdfBytes, DateTime weekStart) async {
     try {
       final fileName =
@@ -1505,29 +1724,6 @@ class AttendanceUIController extends GetxController {
       }
     } catch (e) {
       _handleException('Failed to fetch wage summary', e);
-    }
-  }
-
-  Future<void> exportAttendanceToExcel(
-      DateTime fromDate, DateTime toDate) async {
-    if (isExporting.value) return;
-    isExporting.value = true;
-
-    try {
-      final response = await AttendanceService.exportAttendance(
-          fromDate: fromDate, toDate: toDate);
-
-      if (response['success'] == true && response['data'] != null) {
-        final exportData =
-            AttendanceService.attendanceExportFromJson(response['data']);
-        _showExportSuccessDialog(exportData, fromDate, toDate);
-      } else {
-        _handleApiError(response);
-      }
-    } catch (e) {
-      _handleException('Export failed', e);
-    } finally {
-      isExporting.value = false;
     }
   }
 
@@ -1724,21 +1920,6 @@ class AttendanceUIController extends GetxController {
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  void _showExportSuccessDialog(
-      AttendanceExport exportData, DateTime fromDate, DateTime toDate) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Export Complete'),
-        content: Text(
-            'Exported ${exportData.totalRecords} records for date range:\n'
-            '${DateFormat('dd/MM/yyyy').format(fromDate)} to ${DateFormat('dd/MM/yyyy').format(toDate)}'),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('OK')),
         ],
       ),
     );
